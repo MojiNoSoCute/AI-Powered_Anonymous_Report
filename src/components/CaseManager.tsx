@@ -336,6 +336,34 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
     showToast(`อัปเดตระดับความเร่งด่วนเป็น "${newUrgency.toUpperCase()}" เรียบร้อยแล้ว`, 'success');
   };
 
+  const getCategoryLabel = (cat: CategoryType): string => {
+    switch (cat) {
+      case 'harassment': return 'การล่วงละเมิดและคุกคาม (Harassment & Bullying)';
+      case 'compliance': return 'การปฏิบัติตามกฎระเบียบ (Compliance & Ethics)';
+      case 'teaching': return 'รายงานเกี่ยวกับอาจารย์ / คุณภาพการสอน (Teaching & Instructor Issues)';
+      case 'technical': return 'ปัญหาทางเทคนิค/ความปลอดภัย (Technical / Security)';
+      case 'fraud': return 'การทุจริตทางการเงิน (Financial Fraud)';
+      case 'safety': return 'ความปลอดภัยและสิ่งแวดล้อม (Safety)';
+      case 'academic': return 'การประพฤติผิดทางวิชาการ (Academic Misconduct)';
+      default: return 'อื่นๆ';
+    }
+  };
+
+  // Quick Category update (Admin/Staff only)
+  const handleUpdateCategory = (reportId: string, newCategory: CategoryType) => {
+    const operator = user?.name ? `Admin_${user.name}` : 'Admin_CaseManager';
+    db.updateReport(reportId, { category: newCategory, categoryLabelTh: getCategoryLabel(newCategory) }, operator);
+    const updated = db.getReportById(reportId);
+    if (updated) {
+      realtimeService.sendReportUpdate(updated);
+      if (activeModalCase && activeModalCase.id.toLowerCase() === reportId.toLowerCase()) {
+        setActiveModalCase(updated);
+      }
+    }
+    refreshReports();
+    showToast(`อัปเดตหมวดหมู่เป็น "${getCategoryLabel(newCategory)}" เรียบร้อยแล้ว`, 'success');
+  };
+
   // Delete Evidence File
   const handleDeleteEvidence = (reportId: string, evidenceId: string) => {
     const operator = user?.name ? `Admin_${user.name}` : 'Admin_CaseManager';
@@ -986,7 +1014,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
               <div className="space-y-4">
                 
                 {/* Meta Overview */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-rose-50/60 p-3.5 rounded-xl text-xs border border-rose-100">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-rose-50/60 p-3.5 rounded-xl text-xs border border-rose-100">
                   <div>
                     <span className="text-slate-500 block font-medium">วันที่เกิดเหตุ:</span>
                     <span className="font-bold text-slate-900">{activeModalCase.incidentDate}</span>
@@ -994,6 +1022,12 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
                   <div>
                     <span className="text-slate-500 block font-medium">สถานที่:</span>
                     <span className="font-bold text-slate-900 truncate block">{activeModalCase.location}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block font-medium">หมวดหมู่คดี:</span>
+                    <span className="font-bold text-rose-900 truncate block" title={activeModalCase.categoryLabelTh || activeModalCase.category}>
+                      {activeModalCase.categoryLabelTh ? activeModalCase.categoryLabelTh.split('(')[0].trim() : activeModalCase.category}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-500 block font-medium">ระดับความเร่งด่วน:</span>
@@ -1005,7 +1039,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
                   </div>
                 </div>
 
-                {/* Quick Status & Urgency Setter for Admin */}
+                {/* Quick Status, Urgency & Category Setter for Admin */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-rose-100 pt-3">
                   {/* Quick Status Setter */}
                   <div className="space-y-2">
@@ -1057,6 +1091,38 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
                           }`}
                         >
                           {urg.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Quick Category Setter for Admin */}
+                  <div className="space-y-2 col-span-1 sm:col-span-2 pt-2 border-t border-rose-100/60">
+                    <span className="text-xs font-bold text-rose-900 flex items-center gap-1">
+                      <Lock className="w-3.5 h-3.5 text-rose-700" />
+                      <span>ปรับเปลี่ยนหมวดหมู่เรื่องร้องเรียน (สิทธิ์เฉพาะเจ้าหน้าที่):</span>
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { id: 'harassment', label: 'การล่วงละเมิด/คุกคาม' },
+                        { id: 'compliance', label: 'การปฏิบัติตามกฎระเบียบ' },
+                        { id: 'teaching', label: 'อาจารย์/การสอน' },
+                        { id: 'technical', label: 'เทคนิค/ความปลอดภัย' },
+                        { id: 'fraud', label: 'ทุจริตทางการเงิน' },
+                        { id: 'safety', label: 'ความปลอดภัย/สิ่งแวดล้อม' },
+                        { id: 'academic', label: 'ประพฤติผิดทางวิชาการ' }
+                      ].map((catItem) => (
+                        <button
+                          key={catItem.id}
+                          type="button"
+                          onClick={() => handleUpdateCategory(activeModalCase.id, catItem.id as CategoryType)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            activeModalCase.category === catItem.id
+                              ? 'bg-rose-900 text-white ring-2 ring-rose-900/30 shadow-xs'
+                              : 'bg-slate-100 text-slate-700 hover:bg-rose-100 hover:text-rose-900'
+                          }`}
+                        >
+                          {catItem.label}
                         </button>
                       ))}
                     </div>

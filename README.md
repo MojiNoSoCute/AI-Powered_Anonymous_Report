@@ -238,5 +238,10 @@ python app.py
 
 ---
 
+## 📑 เอกสารข้อกำหนดและการทดสอบ (Documentation & Testing)
+- **[ข้อกำหนดความต้องการเชิงหน้าที่สำหรับทำ Test Cases (Functional Requirements Specification)](docs/FUNCTIONAL_REQUIREMENTS.md)**: ระบุ Requirement IDs (เช่น `FR-SUB-001`, `FR-AI-001`, `FR-CAS-001`), Inputs, Expected Results และ Acceptance Criteria ครบทุกโมดูล สำหรับทีม QA นำไปเขียน Test Scenarios
+
+---
+
 ## ⚖️ ลิขสิทธิ์และการใช้งาน (License & Disclaimer)
 พัฒนาขึ้นสำหรับ **มหาวิทยาลัยราชภัฏนครปฐม (Nakhon Pathom Rajabhat University - NPRU)** เพื่อเป็นระบบแจ้งเบาะแสและร้องเรียนที่โปร่งใส ตรวจสอบได้ และรักษาความลับของผู้ร้องเรียนตามมาตรฐานจริยธรรมและ พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล (PDPA)

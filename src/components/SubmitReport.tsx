@@ -9,17 +9,19 @@ import {
   UploadCloud, Send, Save, CheckCircle2, LockKeyhole, Calendar, MapPin, Trash2, File,
   Copy, Check, Sparkles, Bot, Wand2, RefreshCw
 } from 'lucide-react';
-import { CategoryType, UrgencyLevel, EvidenceFile } from '../types';
+import { CategoryType, UrgencyLevel, EvidenceFile, UserSession } from '../types';
 import { db } from '../db/sqlite';
 import { analyzeReportWithRealAI, analyzeReportWithAI, AIAnalysisResult } from '../lib/aiAnalyzer';
 
 interface SubmitReportProps {
   onSuccessSubmit: (reportId: string, pin: string) => void;
+  user?: UserSession;
 }
 
-export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) => {
-  const [category, setCategory] = useState<CategoryType>('harassment');
-  const [urgency, setUrgency] = useState<UrgencyLevel>('low');
+export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, user }) => {
+  const isStaff = Boolean(user?.isAuthenticated && (user.role === 'admin' || user.role === 'investigator'));
+  const [category, setCategory] = useState<CategoryType | null>(null);
+  const [urgency, setUrgency] = useState<UrgencyLevel | null>(null);
   const [incidentDate, setIncidentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -78,7 +80,8 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
     } else if (trimmed.length === 0) {
       setAiResult(null);
       setAiApplied(false);
-      setUrgency('low');
+      setCategory(null);
+      setUrgency(null);
     }
 
     return () => {
@@ -157,11 +160,14 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
     // Generate random 4-digit PIN
     const generatedPin = Math.floor(1000 + Math.random() * 9000).toString();
 
+    const finalCategory: CategoryType = category || (aiResult?.category || 'compliance');
+    const finalUrgency: UrgencyLevel = urgency || (aiResult?.urgency || 'low');
+
     const created = db.createReport({
       pin: generatedPin,
-      category,
-      categoryLabelTh: getCategoryLabel(category),
-      urgency,
+      category: finalCategory,
+      categoryLabelTh: getCategoryLabel(finalCategory),
+      urgency: finalUrgency,
       incidentDate: incidentDate || new Date().toISOString().split('T')[0],
       location: location || 'ไม่ระบุ',
       description,
@@ -172,7 +178,8 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
     setShowSuccessModal(true);
   };
 
-  const getCategoryLabel = (cat: CategoryType): string => {
+  const getCategoryLabel = (cat: CategoryType | null): string => {
+    if (!cat) return 'ยังไม่ได้ระบุ';
     switch (cat) {
       case 'harassment': return 'การล่วงละเมิดและคุกคาม (Harassment & Bullying)';
       case 'compliance': return 'การปฏิบัติตามกฎระเบียบ (Compliance & Ethics)';
@@ -499,11 +506,32 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
             )}
           </div>
 
-          {/* Step 3: Category */}
+          {/* Step 3: Category (Auto-Analyzed by AI - Staff Only Edit) */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-              <div className="w-6 h-6 rounded-md bg-rose-900 text-white flex items-center justify-center text-xs font-extrabold">3</div>
-              <span>เลือกหมวดหมู่เรื่องร้องเรียน (Category)</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                <div className="w-6 h-6 rounded-md bg-rose-900 text-white flex items-center justify-center text-xs font-extrabold">3</div>
+                <span>หมวดหมู่เรื่องร้องเรียน (Category)</span>
+                {category ? (
+                  <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
+                    <Bot className="w-3 h-3 text-amber-700" />
+                    <span>AI วิเคราะห์แล้ว</span>
+                  </span>
+                ) : (
+                  <span className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1">
+                    <span>ยังไม่ได้เลือก (รอ AI วิเคราะห์)</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 text-[11px] bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                <Lock className="w-3.5 h-3.5 text-rose-800 shrink-0" />
+                <span className="font-semibold text-rose-900">
+                  {isStaff 
+                    ? 'สิทธิ์เจ้าหน้าที่: คุณสามารถคลิกเลือกปรับเปลี่ยนหมวดหมู่ได้' 
+                    : 'เฉพาะ AI และ เจ้าหน้าที่เท่านั้นที่แก้ไขได้'}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -518,47 +546,82 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
               ].map((item) => {
                 const isSelected = category === item.id;
                 return (
-                  <label
+                  <div
                     key={item.id}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                    onClick={() => {
+                      if (isStaff) {
+                        setCategory(item.id as CategoryType);
+                      }
+                    }}
+                    className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between select-none ${
+                      isStaff ? 'cursor-pointer hover:border-rose-400 hover:bg-rose-50/40' : 'cursor-not-allowed'
+                    } ${
                       isSelected
-                        ? 'border-rose-900 bg-rose-50/60 ring-2 ring-rose-900/10 shadow-xs'
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                        ? 'border-rose-900 bg-rose-50/70 ring-2 ring-rose-900/15 shadow-xs'
+                        : 'border-slate-200 bg-slate-50/50 opacity-60'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <span className="text-xs font-bold text-slate-900 leading-tight">{item.title}</span>
-                      <input
-                        type="radio"
-                        name="category"
-                        value={item.id}
-                        checked={isSelected}
-                        onChange={() => setCategory(item.id as CategoryType)}
-                        className="mt-0.5 text-rose-900 accent-rose-900 cursor-pointer"
-                      />
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <span className={`text-xs font-bold leading-tight ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                        {item.title}
+                      </span>
+                      {isSelected ? (
+                        <div className="w-5 h-5 rounded-full bg-rose-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-slate-200/80 text-slate-400 flex items-center justify-center shrink-0">
+                          <Lock className="w-2.5 h-2.5 text-slate-400" />
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[11px] text-slate-500 font-medium">{item.sub}</span>
-                  </label>
+                    <div className="flex items-center justify-between gap-1.5 mt-auto">
+                      <span className="text-[11px] text-slate-500 font-medium">{item.sub}</span>
+                      {isSelected && (
+                        <span className="text-[9px] bg-rose-900 text-white px-2 py-0.5 rounded-full font-bold flex items-center gap-1 shadow-2xs shrink-0">
+                          <Bot className="w-2.5 h-2.5 text-amber-300" />
+                          <span>{isStaff ? 'เลือกโดยเจ้าหน้าที่' : 'AI เลือกให้อัตโนมัติ'}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
+
+            <p className="text-[11px] text-slate-600 bg-rose-50/50 border border-rose-100 p-2.5 rounded-xl flex items-start gap-2">
+              <Bot className="w-4 h-4 text-rose-800 shrink-0 mt-0.5" />
+              <span>
+                <strong>การวิเคราะห์หมวดหมู่อัตโนมัติ:</strong> ระบบ AI Smart Assistant จะวิเคราะห์ข้อความจากรายละเอียดเหตุการณ์ในหัวข้อที่ 1 แล้วกำหนดหมวดหมู่ให้อัตโนมัติ โดยไม่อนุญาตให้แก้ไขได้เอง ทั้งนี้หากจำเป็นต้องเปลี่ยนหมวดหมู่ จะดำเนินการได้เฉพาะระบบ AI หรือเจ้าหน้าที่ผู้รับผิดชอบสำนวนเท่านั้น
+              </span>
+            </p>
           </div>
 
-          {/* Step 4: Urgency Level (Auto-Analyzed by AI - Admin Only Edit) */}
+          {/* Step 4: Urgency Level (Auto-Analyzed by AI - Staff Only Edit) */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <div className="w-6 h-6 rounded-md bg-rose-900 text-white flex items-center justify-center text-xs font-extrabold">4</div>
                 <span>ระดับความเร่งด่วน (Urgency Level)</span>
-                <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
-                  <Bot className="w-3 h-3 text-amber-700" />
-                  <span>วิเคราะห์อัตโนมัติโดย AI Smart Assistant</span>
-                </span>
+                {urgency ? (
+                  <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
+                    <Bot className="w-3 h-3 text-amber-700" />
+                    <span>AI ประเมินแล้ว</span>
+                  </span>
+                ) : (
+                  <span className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1">
+                    <span>ยังไม่ได้เลือก (รอ AI วิเคราะห์)</span>
+                  </span>
+                )}
               </div>
 
-              <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-1 text-[11px] bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                 <Lock className="w-3.5 h-3.5 text-rose-800 shrink-0" />
-                <span className="font-semibold text-rose-900">เฉพาะ Admin เท่านั้นที่สามารถแก้ไขระดับความเร่งด่วนได้</span>
+                <span className="font-semibold text-rose-900">
+                  {isStaff 
+                    ? 'สิทธิ์เจ้าหน้าที่: คุณสามารถคลิกปรับระดับความเร่งด่วนได้' 
+                    : 'เฉพาะ AI และ เจ้าหน้าที่เท่านั้นที่แก้ไขได้'}
+                </span>
               </div>
             </div>
 
@@ -573,7 +636,14 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
                 return (
                   <div
                     key={item.level}
-                    className={`py-3 px-3 rounded-xl border text-center text-xs font-bold transition-all relative flex flex-col items-center justify-center gap-1.5 ${
+                    onClick={() => {
+                      if (isStaff) {
+                        setUrgency(item.level as UrgencyLevel);
+                      }
+                    }}
+                    className={`py-3 px-3 rounded-xl border text-center text-xs font-bold transition-all relative flex flex-col items-center justify-center gap-1.5 select-none ${
+                      isStaff ? 'cursor-pointer hover:ring-2 hover:ring-rose-400' : 'cursor-not-allowed'
+                    } ${
                       isSelected
                         ? 'border-rose-900 bg-rose-900 text-white shadow-sm ring-2 ring-rose-900/20'
                         : `${item.color} opacity-60`
@@ -589,7 +659,7 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
                     </div>
                     {isSelected && (
                       <span className="text-[9px] bg-rose-950/80 text-rose-200 px-1.5 py-0.5 rounded-full font-normal border border-rose-700/50">
-                        AI Smart Assistant ประมวลผลให้
+                        {isStaff ? 'ระดับที่เลือก' : 'AI ประมวลผลให้ (เริ่มต้น: ปกติ)'}
                       </span>
                     )}
                   </div>
@@ -600,7 +670,7 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit }) =
             <p className="text-[11px] text-slate-500 bg-rose-50/50 border border-rose-100 p-2.5 rounded-xl flex items-start gap-2">
               <Bot className="w-4 h-4 text-rose-800 shrink-0 mt-0.5" />
               <span>
-                <strong>การประมวลผลความเร่งด่วน:</strong> ระบบ AI Smart Assistant จะวิเคราะห์เนื้อหาและจัดระดับความเร่งด่วนให้อัตโนมัติ หากต้องการปรับเปลี่ยนระดับความเร่งด่วนหลังจากส่งรายงานแล้ว จะสามารถดำเนินการได้โดยเจ้าหน้าที่ Admin ผู้รับผิดชอบคดีเท่านั้น
+                <strong>การประมวลผลความเร่งด่วน:</strong> ค่าเริ่มต้นกำหนดไว้ที่ระดับ <strong>ปกติ (Low)</strong> และระบบ AI Smart Assistant จะวิเคราะห์คำอธิบายเหตุการณ์เพื่อประเมินความเร่งด่วน หากต้องการปรับเปลี่ยนหลังจากส่งรายงาน จะดำเนินการได้โดยเจ้าหน้าที่ผู้รับผิดชอบสำนวนเท่านั้น
               </span>
             </p>
           </div>

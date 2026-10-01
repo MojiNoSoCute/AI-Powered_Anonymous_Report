@@ -68,7 +68,10 @@ export default function App() {
       {/* Dynamic Content Views */}
       <main className="flex-1 pb-12">
         {currentTab === 'submit' && (
-          <SubmitReport onSuccessSubmit={handleSuccessSubmit} />
+          <SubmitReport 
+            onSuccessSubmit={handleSuccessSubmit}
+            user={user}
+          />
         )}
 
         {currentTab === 'track' && (

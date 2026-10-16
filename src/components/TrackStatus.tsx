@@ -134,7 +134,15 @@ export const TrackStatus: React.FC<TrackStatusProps> = ({
     e.preventDefault();
     setLoginError('');
 
-    const found = db.getReportByIdAndPin(reportIdInput, pinInput);
+    const cleanId = reportIdInput.trim();
+    const cleanPin = pinInput.trim();
+
+    if (!cleanId || !cleanPin) {
+      setLoginError('กรุณากรอกรหัสรายงานและรหัสผ่าน (PIN) ให้ครบถ้วน');
+      return;
+    }
+
+    const found = db.getReportByIdAndPin(cleanId, cleanPin);
     if (!found) {
       setLoginError('ไม่พบรหัสรายงาน หรือรหัสผ่าน (PIN) ไม่ถูกต้อง');
       return;
@@ -269,9 +277,12 @@ export const TrackStatus: React.FC<TrackStatusProps> = ({
           <button
             type="button"
             onClick={() => {
-              setReportIdInput('TL-8942-XCVB');
-              setPinInput('8942');
-              const found = db.getReportByIdAndPin('TL-8942-XCVB', '8942');
+              const testId = 'TL-8942-XCVB';
+              const testPin = '8942';
+              setReportIdInput(testId);
+              setPinInput(testPin);
+              setLoginError('');
+              const found = db.getReportByIdAndPin(testId, testPin);
               if (found) {
                 setActiveReport(found);
                 setMessages(db.getMessages(found.id));
@@ -284,9 +295,12 @@ export const TrackStatus: React.FC<TrackStatusProps> = ({
           <button
             type="button"
             onClick={() => {
-              setReportIdInput('TL-1092-AABB');
-              setPinInput('1092');
-              const found = db.getReportByIdAndPin('TL-1092-AABB', '1092');
+              const testId = 'TL-1092-AABB';
+              const testPin = '1092';
+              setReportIdInput(testId);
+              setPinInput(testPin);
+              setLoginError('');
+              const found = db.getReportByIdAndPin(testId, testPin);
               if (found) {
                 setActiveReport(found);
                 setMessages(db.getMessages(found.id));

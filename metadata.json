@@ -1,6 +1,6 @@
 {
-  "name": "Remix Anonymous Report Portal",
-  "description": "ระบบแจ้งเบาะแสและจัดการข้อมูล NPRU Sentinel พร้อม AI Smart Assistant ช่วยวิเคราะห์หมวดหมู่และความเร่งด่วนอัตโนมัติ และสิทธิ์ปรับแก้ไขความเร่งด่วนเฉพาะ Admin",
+  "name": "Remix Remix Remix Remix Anonymous Report Portal",
+  "description": "ระบบแจ้งเบาะแสและจัดการข้อมูลอย่างเป็นระบบ ปลอดภัย และเข้ารหัส พร้อมระบบติดตามสถานะ แชทลับ และแดชบอร์ดวิเคราะห์ข้อมูล",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

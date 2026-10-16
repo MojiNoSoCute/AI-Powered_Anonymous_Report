@@ -238,8 +238,163 @@ python app.py
 
 ---
 
+## 🧪 การทดสอบระบบอัตโนมัติด้วย Selenium Python (Automated E2E Testing)
+
+ระบบ TrustLine ได้รับการพัฒนาชุดทดสอบอัตโนมัติแบบ **End-to-End (E2E)** ด้วย **Python 3**, **Selenium WebDriver** (Chrome Headless) และ **pytest** โดยครอบคลุมทั้ง 7 โมดูล รวม **68 Test Cases (TC-001 ถึง TC-068)** ตามเอกสารข้อกำหนดในโฟลเดอร์ `docs/`:
+- `docs/FUNCTIONAL_REQUIREMENTS.md` (ข้อกำหนดความต้องการเชิงหน้าที่ FRS)
+- `docs/Annonymous-Test-Cases.docx` (กรณีทดสอบ E2E ทั้งหมด 68 กรณี)
+- `docs/Annonymous-Test-Plan-and-Report.docx` (แผนการทดสอบและผู้รับผิดชอบ)
+
+---
+
+### 📦 1. สิ่งที่ต้องติดตั้งล่วงหน้า (Prerequisites & Installation)
+
+#### ขั้นตอนที่ 1.1: ติดตั้ง Python และ Pip
+- ต้องใช้ **Python 3.10+ หรือ 3.11+**
+- ตรวจสอบเวอร์ชัน: `python3 --version`
+
+#### ขั้นตอนที่ 1.2: ติดตั้ง Chromium และ ChromeDriver
+- **บน Ubuntu / Debian / Linux:**
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y python3-pip chromium chromium-driver
+  ```
+- **บน macOS (Homebrew):**
+  ```bash
+  brew install python chromium chromedriver
+  ```
+- **บน Windows:**
+  - ติดตั้ง Google Chrome และดาวน์โหลด ChromeDriver เวอร์ชันตรงกันจาก [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/)
+  - นำไฟล์ `chromedriver.exe` ไปวางไว้ใน System PATH
+
+#### ขั้นตอนที่ 1.3: ติดตั้ง Python Dependencies
+```bash
+# ติดตั้ง Packages ที่จำเป็นจาก tests/requirements.txt
+pip install -r tests/requirements.txt
+
+# หรือหากใช้ pip3 บน Linux:
+pip3 install -r tests/requirements.txt
+```
+*(รายการ Packages ที่ติดตั้ง: `selenium>=4.20.0`, `pytest>=8.0.0`, `requests>=2.31.0`, `websockets>=12.0`)*
+
+---
+
+### 🔌 2. การเตรียมเซิร์ฟเวอร์ก่อนเริ่มทดสอบ (Server Pre-requisite)
+
+ก่อนสั่งรันการทดสอบ ต้องเปิดเซิร์ฟเวอร์ระบบให้ทำงานอยู่ก่อน (พอร์ต 3000):
+```bash
+# ใน Terminal แรก: สั่งเริ่มรันแอปพลิเคชัน
+npm run dev
+```
+*(ตรวจสอบว่าเข้าใช้งานที่ `http://localhost:3000` ได้ตามปกติ)*
+
+> 💡 *หมายเหตุสำหรับการทดสอบบนเว็บจริง (Live Website / Production):*
+> หากต้องการทดสอบกับเว็บไซต์จริง (เช่น `https://anonymous-report.ai.studio/`) สามารถทำได้ 2 วิธี:
+> 1. ใส่ Flag `--url https://anonymous-report.ai.studio/` ต่อท้ายคำสั่ง `run_tests.py`
+> 2. หรือตั้งค่า Environment Variable `TEST_BASE_URL` ก่อนรัน `pytest`:
+>    - **บน Windows CMD:** `set TEST_BASE_URL=https://anonymous-report.ai.studio/`
+>    - **บน Windows PowerShell:** `$env:TEST_BASE_URL="https://anonymous-report.ai.studio/"`
+>    - **บน Linux / macOS:** `export TEST_BASE_URL="https://anonymous-report.ai.studio/"`
+
+---
+
+### 👥 3. โครงสร้างโฟลเดอร์แยกตามผู้ทดสอบ (Test Folders by Person)
+
+ชุดทดสอบแบ่งออกเป็น 4 โฟลเดอร์ตามผู้รับผิดชอบการทดสอบทั้ง 4 ท่าน:
+
+| ผู้ทดสอบ | โฟลเดอร์ | โมดูลที่รับผิดชอบ | ขอบเขต Test Cases | จำนวนกรณี | ผลการทดสอบจริง |
+|---|---|---|---|:---:|:---:|
+| **วัชรากร (watcharakorn)** | `tests/watcharakorn/` | **Module 1:** การส่งรายงานเบาะแสลับ (FR-SUB)<br>**Module 2:** ระบบวิเคราะห์อัจฉริยะด้วย AI (FR-AI) | TC-001 ถึง TC-030 | **30 Cases** | ✅ **30/30 ผ่าน 100%** |
+| **วุฒิชัย (suttichai)** | `tests/suttichai/` | **Module 3:** ติดตามสถานะและแชทลับ 2 ทาง (FR-TRK)<br>**Module 4:** ระบบจัดการสำนวนคดีสำหรับเจ้าหน้าที่ (FR-CAS) | TC-031 ถึง TC-053 | **23 Cases** | ✅ **23/23 ผ่าน 100%** |
+| **สหรัฐ (saharat)** | `tests/saharat/` | **Module 5:** แดชบอร์ดสถิติและการวิเคราะห์ (FR-ANA)<br>**Module 6:** การยืนยันตัวตนและความปลอดภัย (FR-SEC) | TC-054 ถึง TC-063 | **10 Cases** | ✅ **10/10 ผ่าน 100%** |
+| **อธิป (athip)** | `tests/athip/` | **Module 7:** โครงสร้างพื้นฐาน, WebSocket & SQLite (FR-SYS) | TC-064 ถึง TC-068 | **5 Cases** | ✅ **5/5 ผ่าน 100%** |
+| **รวมทั้งสิ้น** | `tests/` | **ครบทั้ง 7 โมดูลตามเอกสาร FRS** | **TC-001 ถึง TC-068** | **68 Cases** | ✅ **68/68 ผ่าน 100%** |
+
+---
+
+### 🚀 4. คำสั่งการรันการทดสอบ (Execution Commands)
+
+> 🌐 **เว็บจริงที่ใช้ทดสอบ (Live Web Target):**  
+> ระบบถูกตั้งค่าเริ่มต้นให้ยิงทดสอบไปยัง **`https://anonymous-report.ai.studio/`** โดยตรงทันที ไม่จำเป็นต้องรัน `npm run dev` ในเครื่อง  
+> 
+> 🚗 **ระบบจัดการ ChromeDriver อัตโนมัติ:**  
+> มี `webdriver-manager` ตรวจจับเวอร์ชัน Google Chrome ในเครื่องของคุณและจัดเตรียมไดรเวอร์ให้โดยอัตโนมัติ ไม่ต้องโหลดไฟล์หรือตั้ง PATH เอง  
+> 
+> 💡 **สำหรับผู้ใช้งาน Windows:**  
+> หากพิมพ์ `pytest` แล้วพบข้อความว่า `'pytest' is not recognized` หรือ `[WinError 2]`  
+> ให้ติดตั้ง dependencies ก่อนด้วย:  
+> `python -m pip install -r tests/requirements.txt`  
+> และสั่งรันด้วย **`python tests/run_tests.py`** หรือ **`python -m pytest`**
+
+#### 4.1 สั่งรันผ่านตัวจัดการกลาง `run_tests.py` (แนะนำ - แสดงตารางสรุปผลสวยงาม)
+
+- **บน Windows (Command Prompt หรือ PowerShell):**
+  ```cmd
+  # 🟢 รันการทดสอบทั้งหมด (68 Cases) ยิงไปยัง https://anonymous-report.ai.studio/
+  python tests/run_tests.py --tester all
+
+  # 🔵 รันเฉพาะของ "วัชรากร" (30 Cases)
+  python tests/run_tests.py --tester watcharakorn
+
+  # 🔵 รันเฉพาะของ "วุฒิชัย" (23 Cases)
+  python tests/run_tests.py --tester suttichai
+
+  # 🔵 รันเฉพาะของ "สหรัฐ" (10 Cases)
+  python tests/run_tests.py --tester saharat
+
+  # 🔵 รันเฉพาะของ "อธิป" (5 Cases)
+  python tests/run_tests.py --tester athip
+
+  # 🖥️ โหมดเปิดหน้าต่าง Chrome ให้เห็นการทำงานสด (Headed Mode)
+  python tests/run_tests.py --tester watcharakorn --headed
+  ```
+
+- **บน Linux / macOS:**
+  ```bash
+  python3 tests/run_tests.py --tester all
+  python3 tests/run_tests.py --tester watcharakorn
+  python3 tests/run_tests.py --tester suttichai
+  python3 tests/run_tests.py --tester saharat
+  python3 tests/run_tests.py --tester athip
+  ```
+
+#### 4.2 สั่งรันผ่าน `pytest` โดยตรง
+
+- **บน Windows (ใช้ `python -m pytest`):**
+  ```cmd
+  # 🟢 รันการทดสอบทั้งหมด:
+  python -m pytest tests/ -v
+
+  # 🔵 รันแยกเฉพาะของแต่ละคน:
+  python -m pytest tests/watcharakorn/ -v    # วัชรากร (30 Cases)
+  python -m pytest tests/suttichai/ -v      # วุฒิชัย (23 Cases)
+  python -m pytest tests/saharat/ -v        # สหรัฐ (10 Cases)
+  python -m pytest tests/athip/ -v          # อธิป (5 Cases)
+
+  # 🟡 รันเฉพาะไฟล์ย่อย:
+  python -m pytest tests/watcharakorn/test_sub_module.py -v         # Module 1 (Submission)
+  python -m pytest tests/watcharakorn/test_ai_module.py -v          # Module 2 (AI Analysis)
+  python -m pytest tests/suttichai/test_tracking_chat.py -v         # Module 3 (Tracking & Chat)
+  python -m pytest tests/suttichai/test_case_management.py -v       # Module 4 (Case Manager)
+  python -m pytest tests/saharat/test_analytics_dashboard.py -v     # Module 5 (Analytics)
+  python -m pytest tests/saharat/test_auth_security.py -v           # Module 6 (Auth & Security)
+  python -m pytest tests/athip/test_infrastructure.py -v            # Module 7 (Infrastructure)
+  ```
+
+- **บน Linux / macOS (ใช้ `pytest` หรือ `python3 -m pytest`):**
+  ```bash
+  pytest tests/watcharakorn/ -v
+  pytest tests/suttichai/ -v
+  pytest tests/saharat/ -v
+  pytest tests/athip/ -v
+  ```
+
+---
+
 ## 📑 เอกสารข้อกำหนดและการทดสอบ (Documentation & Testing)
 - **[ข้อกำหนดความต้องการเชิงหน้าที่สำหรับทำ Test Cases (Functional Requirements Specification)](docs/FUNCTIONAL_REQUIREMENTS.md)**: ระบุ Requirement IDs (เช่น `FR-SUB-001`, `FR-AI-001`, `FR-CAS-001`), Inputs, Expected Results และ Acceptance Criteria ครบทุกโมดูล สำหรับทีม QA นำไปเขียน Test Scenarios
+- **[ไฟล์กรณีทดสอบทั้งหมด 68 กรณี (Annonymous-Test-Cases.docx)](docs/Annonymous-Test-Cases.docx)**: รายละเอียด Pre-conditions, Steps, Test Data, Expected Results
+- **[แผนการทดสอบและรายงานผล (Annonymous-Test-Plan-and-Report.docx)](docs/Annonymous-Test-Plan-and-Report.docx)**: การแบ่งบทบาทผู้ทดสอบ, รอบการทดสอบ และเกณฑ์การประเมิน
 
 ---
 

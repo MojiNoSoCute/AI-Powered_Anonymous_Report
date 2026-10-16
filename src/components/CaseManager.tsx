@@ -11,11 +11,12 @@ import {
   Shield, Search, Download, ChevronLeft, ChevronRight, X, Eye, 
   MessageSquare, Trash2, Edit3, Save, Video, Image as ImageIcon, 
   FileText, Play, Upload, CheckCircle2, AlertTriangle, AlertOctagon, UserPlus, FileSpreadsheet,
-  Lock, Send, Sparkles, Clock, RefreshCw, Radio
+  Lock, Send, Sparkles, Clock, RefreshCw, Radio, Database
 } from 'lucide-react';
 import { ReportItem, ReportStatus, UrgencyLevel, CategoryType, EvidenceFile, ChatMessage, UserSession } from '../types';
 import { db } from '../db/sqlite';
 import { realtimeService } from '../services/realtime';
+import { DatabaseInspectorModal } from './DatabaseInspectorModal';
 
 interface CaseManagerProps {
   onOpenChatWithCase?: (caseId: string) => void;
@@ -28,6 +29,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isDbInspectorOpen, setIsDbInspectorOpen] = useState<boolean>(false);
   
   // Modals state
   const [activeModalCase, setActiveModalCase] = useState<ReportItem | null>(null);
@@ -508,13 +510,24 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
           </p>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-800 hover:to-rose-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-        >
-          <Download className="w-4 h-4 text-rose-200" />
-          <span>ส่งออกไฟล์ CSV (Export Data)</span>
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setIsDbInspectorOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95 border border-slate-700"
+          >
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>ฐานข้อมูลจริง (SQLite Engine)</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="bg-gradient-to-r from-red-700 to-rose-700 hover:from-red-800 hover:to-rose-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <Download className="w-4 h-4 text-rose-200" />
+            <span>ส่งออกไฟล์ CSV (Export Data)</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -728,6 +741,7 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
                             const totalMessages = db.getMessages(r.id).length;
                             return (
                               <button
+                                data-testid="open-case-chat"
                                 onClick={() => handleOpenAdminChat(r)}
                                 className={`p-1.5 rounded-lg transition-colors cursor-pointer relative ${
                                   unreadCount > 0 
@@ -1517,6 +1531,8 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
                 </button>
                 <button
                   onClick={() => setActiveChatCase(null)}
+                  data-testid="close-admin-chat"
+                  title="ปิดหน้าต่างสนทนา"
                   className="p-1.5 rounded-lg bg-white/10 hover:bg-rose-800 text-white transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
@@ -1663,6 +1679,13 @@ export const CaseManager: React.FC<CaseManagerProps> = ({ onOpenChatWithCase, us
           </div>
         </div>
       )}
+
+      {/* Real SQLite Database Inspector Modal */}
+      <DatabaseInspectorModal
+        isOpen={isDbInspectorOpen}
+        onClose={() => setIsDbInspectorOpen(false)}
+        onDatabaseReset={() => setReports(db.getReports())}
+      />
 
     </div>
   );

@@ -51,6 +51,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Admin / Staff items
   const adminNavItems = [
+    { id: 'submit' as const, label: 'สร้างรายงานใหม่', icon: FileText },
+    { id: 'track' as const, label: 'ติดตามสถานะ', icon: Lock },
     { id: 'cases' as const, label: 'จัดการรายงานทั้งหมด', icon: LayoutDashboard, unreadCount: totalAdminUnread },
     { id: 'analytics' as const, label: 'สถิติ & สรุปผล', icon: Activity },
   ];

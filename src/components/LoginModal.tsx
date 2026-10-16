@@ -15,8 +15,8 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   if (!isOpen) return null;
@@ -33,8 +33,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         role: 'admin'
       });
       onClose();
+    } else if (username === 'officer1' && password === 'password123') {
+      onLoginSuccess({
+        isAuthenticated: true,
+        username: 'officer1',
+        name: 'เจ้าหน้าที่สืบสวน วุฒิชัย (Officer)',
+        role: 'investigator'
+      });
+      onClose();
     } else {
-      setErrorMsg('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin / password123)');
+      setErrorMsg('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin หรือ officer1 / password123)');
     }
   };
 

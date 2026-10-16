@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS users (
 INSERT OR IGNORE INTO reports (id, pin_hash, category, urgency, incident_date, location, description, status, assigned_to)
 VALUES 
 ('TL-8942-XCVB', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'fraud', 'high', '2024-10-10', 'สำนักงานใหญ่ ชั้น 14', 'พบความผิดปกติในการอนุมัติงบประมาณการจัดซื้อซอฟต์แวร์ของแผนก IT', 'investigating', 'เจ้าหน้าที่สืบสวน สมชาย'),
+('TL-1092-AABB', '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4', 'harassment', 'high', '2024-10-16', 'อาคารเฉลิมพระเกียรติ ชั้น 4', 'มีพฤติกรรมการใช้วาจาคุกคามและข่มขู่ทางวาจาจากบุคคลในภาควิชา', 'investigating', 'นิติกร ประวิทย์ (ฝ่ายวินัย)'),
 ('TL-2024-089A', 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb', 'fraud', 'critical', '2024-10-24', 'อาคารเรียนรวม 2', 'ตรวจพบใบเสร็จรับเงินเท็จสำหรับการจัดซื้ออุปกรณ์ห้องปฏิบัติการคอมพิวเตอร์', 'investigating', 'เจ้าหน้าที่ HR นารี');
 
 INSERT OR IGNORE INTO audit_logs (user_name, action_text, ip_address, status)

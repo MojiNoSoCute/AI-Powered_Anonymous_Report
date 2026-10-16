@@ -4,6 +4,7 @@ import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import * as sqliteDb from './server/sqliteDb';
 
 dotenv.config();
 
@@ -34,160 +35,6 @@ const urgencyNamesTh: Record<string, string> = {
   critical: 'วิกฤต (Critical)',
 };
 
-// --- In-Memory Synchronized Backend Store ---
-let serverReports: any[] = [
-  {
-    id: 'TL-8942-XCVB',
-    pin: '8942',
-    category: 'fraud',
-    categoryLabelTh: 'การทุจริตทางการเงิน',
-    urgency: 'high',
-    incidentDate: '2024-10-10',
-    location: 'สำนักงานใหญ่ ชั้น 14',
-    description: 'พบความผิดปกติในการอนุมัติงบประมาณการจัดซื้อซอฟต์แวร์ของแผนก IT โดยไม่มีการประมูลตามขั้นตอนปกติ',
-    status: 'investigating',
-    statusLabelTh: 'กำลังตรวจสอบข้อเท็จจริง',
-    assignedTo: 'เจ้าหน้าที่สืบสวน สมชาย',
-    createdAt: '2024-10-12T09:30:00Z',
-    updatedAt: '2024-10-14T09:10:00Z',
-    evidenceFiles: [
-      {
-        id: 'ev-1',
-        reportId: 'TL-8942-XCVB',
-        fileName: 'NPRU_Software_Engineering_Logo.png',
-        fileSize: 245000,
-        fileType: 'image/png',
-        url: 'https://lh3.googleusercontent.com/aida/AP1WRLtU44n3f_tjW66fZilAlpQg6COjKylcfyMotAx17aYlNkTDIA-fW67FtlHS3vhd48wYNNwEMys_5vOkD8nxOVcyRXbHJtHu5IJC4TSRdhd3YVcL8a3_qK6WBXcunS2QAu_NKlh2mOtg9jhoMcB7RWAhoqRTwUq0bfWEISeHr9akBF4qxnLJ_Gjrte3ZbdUxiskXf1teAaZj7YFsI6xKM5IfLvo-DdqU6BpIhn_Ly2-l_kApOnM58wkpei0',
-        uploadedAt: '2024-10-12 09:30'
-      },
-      {
-        id: 'ev-2',
-        reportId: 'TL-8942-XCVB',
-        fileName: 'PO_Software_License_2024.pdf',
-        fileSize: 1240000,
-        fileType: 'application/pdf',
-        url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80',
-        uploadedAt: '2024-10-13 15:10'
-      },
-      {
-        id: 'ev-video-1',
-        reportId: 'TL-8942-XCVB',
-        fileName: 'CCTV_Software_Department_Evidence.mp4',
-        fileSize: 8450000,
-        fileType: 'video/mp4',
-        url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        uploadedAt: '2024-10-14 10:15'
-      }
-    ]
-  },
-  {
-    id: 'TL-2024-089A',
-    pin: '1111',
-    category: 'fraud',
-    categoryLabelTh: 'การทุจริตทางการเงิน',
-    urgency: 'critical',
-    incidentDate: '2024-10-24',
-    location: 'อาคารเรียนรวม 2',
-    description: 'ตรวจพบใบเสร็จรับเงินเท็จสำหรับการจัดซื้ออุปกรณ์ห้องปฏิบัติการคอมพิวเตอร์',
-    status: 'investigating',
-    statusLabelTh: 'กำลังตรวจสอบข้อเท็จจริง',
-    assignedTo: 'เจ้าหน้าที่ HR นารี',
-    createdAt: '2024-10-24T11:20:00Z',
-    updatedAt: '2024-10-25T14:00:00Z',
-    evidenceFiles: [
-      {
-        id: 'ev-3',
-        reportId: 'TL-2024-089A',
-        fileName: 'Receipt_Audit_Evidence.jpg',
-        fileSize: 890000,
-        fileType: 'image/jpeg',
-        url: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
-        uploadedAt: '2024-10-24 11:25'
-      }
-    ]
-  },
-  {
-    id: 'TL-2024-088B',
-    pin: '2222',
-    category: 'harassment',
-    categoryLabelTh: 'การล่วงละเมิดในที่ทำงาน',
-    urgency: 'high',
-    incidentDate: '2024-10-22',
-    location: 'แผนกการเงิน ชั้น 3',
-    description: 'มีการใช้วาจาข่มขู่และคุกคามในสถานที่ทำงานอย่างต่อเนื่อง',
-    status: 'received',
-    statusLabelTh: 'รับเรื่องแล้ว',
-    assignedTo: 'ยังไม่มอบหมาย',
-    createdAt: '2024-10-22T08:15:00Z',
-    updatedAt: '2024-10-22T08:15:00Z',
-    evidenceFiles: []
-  },
-  {
-    id: 'TL-2024-075C',
-    pin: '3333',
-    category: 'compliance',
-    categoryLabelTh: 'การปฏิบัติตามกฎระเบียบ',
-    urgency: 'medium',
-    incidentDate: '2024-10-18',
-    location: 'ศูนย์คอมพิวเตอร์',
-    description: 'การเปิดเผยข้อมูลส่วนบุคคลของนักศึกษาโดยไม่ได้รับอนุญาต',
-    status: 'disciplinary',
-    statusLabelTh: 'ดำเนินการทางวินัย/กฎหมาย',
-    assignedTo: 'นิติกร ประวิทย์',
-    createdAt: '2024-10-18T16:45:00Z',
-    updatedAt: '2024-10-21T10:30:00Z',
-    evidenceFiles: []
-  },
-  {
-    id: 'TL-2024-061D',
-    pin: '4444',
-    category: 'technical',
-    categoryLabelTh: 'ปัญหาทางเทคนิค/ความปลอดภัย',
-    urgency: 'low',
-    incidentDate: '2024-10-15',
-    location: 'ระบบเซิร์ฟเวอร์หลัก',
-    description: 'พบคะแนนสอบรั่วไหลในระบบจัดเก็บไฟล์ส่วนกลาง',
-    status: 'closed',
-    statusLabelTh: 'ปิดเรื่องเรียบร้อยแล้ว',
-    assignedTo: 'ทีมงานความปลอดภัย IT',
-    createdAt: '2024-10-15T13:00:00Z',
-    updatedAt: '2024-10-17T17:00:00Z',
-    evidenceFiles: []
-  }
-];
-
-let serverMessages: Record<string, any[]> = {
-  'TL-8942-XCVB': [
-    {
-      id: 'msg-1',
-      reportId: 'TL-8942-XCVB',
-      senderRole: 'investigator',
-      senderName: 'เจ้าหน้าที่สืบสวน',
-      message: 'เรียนผู้แจ้งเบาะแส, ขอขอบคุณสำหรับข้อมูลเพิ่มเติม ทางเราต้องการสอบถามว่าเหตุการณ์ที่ระบุเกิดขึ้นที่สาขาใดครับ?',
-      timestamp: '13 ต.ค. 14:20',
-      readByAdmin: true
-    },
-    {
-      id: 'msg-2',
-      reportId: 'TL-8942-XCVB',
-      senderRole: 'reporter',
-      senderName: 'คุณ (ผู้แจ้ง)',
-      message: 'เกิดขึ้นที่สาขาสำนักงานใหญ่ ชั้น 14 ครับ',
-      timestamp: '13 ต.ค. 15:05',
-      readByAdmin: true
-    },
-    {
-      id: 'msg-3',
-      reportId: 'TL-8942-XCVB',
-      senderRole: 'investigator',
-      senderName: 'เจ้าหน้าที่สืบสวน',
-      message: 'รับทราบครับ หากมีหลักฐานภาพถ่ายเพิ่มเติม สามารถอัปโหลดในระบบได้เลยครับ',
-      timestamp: '14 ต.ค. 09:10',
-      readByAdmin: true
-    }
-  ]
-};
-
 // --- WebSocket Connection Management ---
 interface ClientConnection {
   ws: WebSocket;
@@ -213,6 +60,7 @@ function broadcast(payload: any, targetCaseId?: string, skipWs?: WebSocket) {
     }
   }
 }
+
 
 // --- REST API Endpoints ---
 
@@ -330,98 +178,250 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Reports API
+// Reports API - Real SQLite CRUD
 app.get('/api/reports', (req, res) => {
-  res.json(serverReports);
+  try {
+    const reports = sqliteDb.getAllReports();
+    res.json(reports);
+  } catch (err: any) {
+    console.error('Error fetching reports from SQLite:', err);
+    res.status(500).json({ error: 'Failed to fetch reports from SQLite database' });
+  }
 });
 
 app.get('/api/reports/:id', (req, res) => {
-  const report = serverReports.find(r => r.id.toLowerCase() === req.params.id.trim().toLowerCase());
-  if (!report) return res.status(404).json({ error: 'ไม่พบรายงาน' });
-  res.json(report);
-});
-
-app.post('/api/reports', (req, res) => {
-  const newReport = req.body;
-  if (!newReport || !newReport.id) {
-    return res.status(400).json({ error: 'ข้อมูลรายงานไม่ถูกต้อง' });
+  try {
+    const report = sqliteDb.getReportById(req.params.id);
+    if (!report) return res.status(404).json({ error: 'ไม่พบรายงาน' });
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch report' });
   }
-  serverReports.unshift(newReport);
-  broadcast({ type: 'report_created', report: newReport });
-  res.json({ success: true, report: newReport });
 });
 
+// Verify PIN / Track report
+app.post('/api/reports/verify', (req, res) => {
+  try {
+    const { id, pin } = req.body;
+    if (!id || !pin) {
+      return res.status(400).json({ error: 'กรุณาระบุรหัสรายงานและรหัส PIN' });
+    }
+    const report = sqliteDb.getReportByIdAndPin(id, pin);
+    if (!report) {
+      return res.status(404).json({ error: 'ไม่พบข้อมูลรายงาน หรือรหัส PIN ไม่ถูกต้อง' });
+    }
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Verification error' });
+  }
+});
+
+// Create Report - Real SQLite INSERT
+app.post('/api/reports', (req, res) => {
+  try {
+    const newReportData = req.body;
+    if (!newReportData || !newReportData.description) {
+      return res.status(400).json({ error: 'ข้อมูลรายงานไม่ถูกต้อง กรุณากรอกรายละเอียด' });
+    }
+    const operator = req.headers['x-user-name'] ? String(req.headers['x-user-name']) : 'Anonymous_User';
+    const createdReport = sqliteDb.createReport(newReportData, operator);
+
+    // Broadcast realtime event
+    broadcast({ type: 'report_created', report: createdReport });
+
+    res.json({ success: true, report: createdReport });
+  } catch (err: any) {
+    console.error('Error inserting report into SQLite:', err);
+    res.status(500).json({ error: 'Failed to create report in SQLite database', details: err?.message });
+  }
+});
+
+// Update Report - Real SQLite UPDATE
 app.put('/api/reports/:id', (req, res) => {
-  const id = req.params.id.trim().toLowerCase();
-  const idx = serverReports.findIndex(r => r.id.toLowerCase() === id);
-  if (idx === -1) return res.status(404).json({ error: 'ไม่พบรายงาน' });
+  try {
+    const id = req.params.id.trim();
+    const operator = req.headers['x-user-name'] ? String(req.headers['x-user-name']) : 'Admin';
+    const updated = sqliteDb.updateReport(id, req.body, operator);
 
-  serverReports[idx] = { ...serverReports[idx], ...req.body, updatedAt: new Date().toISOString() };
-  const updated = serverReports[idx];
-  broadcast({ type: 'report_updated', report: updated });
-  res.json({ success: true, report: updated });
+    if (!updated) {
+      return res.status(404).json({ error: 'ไม่พบรายงานในฐานข้อมูล SQLite' });
+    }
+
+    broadcast({ type: 'report_updated', report: updated });
+    res.json({ success: true, report: updated });
+  } catch (err: any) {
+    console.error('Error updating report in SQLite:', err);
+    res.status(500).json({ error: 'Failed to update report in SQLite database' });
+  }
 });
 
+// Delete Report - Real SQLite DELETE (Cascading messages and evidence)
 app.delete('/api/reports/:id', (req, res) => {
-  const id = req.params.id.trim().toLowerCase();
-  const idx = serverReports.findIndex(r => r.id.toLowerCase() === id);
-  if (idx === -1) return res.status(404).json({ error: 'ไม่พบรายงาน' });
+  try {
+    const id = req.params.id.trim();
+    const operator = req.headers['x-user-name'] ? String(req.headers['x-user-name']) : 'Admin';
+    const success = sqliteDb.deleteReport(id, operator);
 
-  const deleted = serverReports.splice(idx, 1)[0];
-  delete serverMessages[deleted.id];
-  broadcast({ type: 'report_deleted', reportId: deleted.id });
-  res.json({ success: true, reportId: deleted.id });
+    if (!success) {
+      return res.status(404).json({ error: 'ไม่พบรายงานในฐานข้อมูล' });
+    }
+
+    broadcast({ type: 'report_deleted', reportId: id });
+    res.json({ success: true, reportId: id });
+  } catch (err: any) {
+    console.error('Error deleting report from SQLite:', err);
+    res.status(500).json({ error: 'Failed to delete report from SQLite database' });
+  }
 });
 
-// Messages API
+// Evidence Files API - Real SQLite INSERT/DELETE
+app.post('/api/reports/:id/evidence', (req, res) => {
+  try {
+    const reportId = req.params.id.trim();
+    const file = req.body;
+    const operator = req.headers['x-user-name'] ? String(req.headers['x-user-name']) : 'User';
+    const ok = sqliteDb.addEvidence(reportId, file, operator);
+
+    if (!ok) {
+      return res.status(404).json({ error: 'ไม่พบรายงานสำหรับแนบไฟล์' });
+    }
+
+    const updated = sqliteDb.getReportById(reportId);
+    if (updated) broadcast({ type: 'report_updated', report: updated });
+
+    res.json({ success: true, report: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to add evidence' });
+  }
+});
+
+app.delete('/api/reports/:id/evidence/:evidenceId', (req, res) => {
+  try {
+    const reportId = req.params.id.trim();
+    const evidenceId = req.params.evidenceId.trim();
+    const operator = req.headers['x-user-name'] ? String(req.headers['x-user-name']) : 'Admin';
+    const ok = sqliteDb.removeEvidence(reportId, evidenceId, operator);
+
+    if (!ok) {
+      return res.status(404).json({ error: 'ไม่พบไฟล์หลักฐาน' });
+    }
+
+    const updated = sqliteDb.getReportById(reportId);
+    if (updated) broadcast({ type: 'report_updated', report: updated });
+
+    res.json({ success: true, report: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to remove evidence' });
+  }
+});
+
+// Messages API - Real SQLite CRUD
 app.get('/api/reports/:id/messages', (req, res) => {
-  const id = req.params.id.trim();
-  res.json(serverMessages[id] || []);
+  try {
+    const id = req.params.id.trim();
+    const messages = sqliteDb.getMessages(id);
+    res.json(messages);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch messages' });
+  }
 });
 
 app.post('/api/reports/:id/messages', (req, res) => {
-  const reportId = req.params.id.trim();
-  const { senderRole, senderName, message } = req.body;
+  try {
+    const reportId = req.params.id.trim();
+    const { senderRole, senderName, message } = req.body;
 
-  if (!message || !message.trim()) {
-    return res.status(400).json({ error: 'กรุณากรอกข้อความ' });
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'กรุณากรอกข้อความ' });
+    }
+
+    const now = new Date();
+    const timeStr = `${now.getDate()} ต.ค. ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    const newMsg = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      reportId,
+      senderRole: senderRole || 'reporter',
+      senderName: senderName || 'ผู้ใช้',
+      message: message.trim(),
+      timestamp: timeStr,
+      readByAdmin: senderRole === 'investigator'
+    };
+
+    sqliteDb.insertMessage(newMsg);
+    broadcast({ type: 'new_message', reportId, message: newMsg }, reportId);
+
+    res.json({ success: true, message: newMsg });
+  } catch (err: any) {
+    console.error('Error inserting message into SQLite:', err);
+    res.status(500).json({ error: 'Failed to send message' });
   }
-
-  if (!serverMessages[reportId]) {
-    serverMessages[reportId] = [];
-  }
-
-  const now = new Date();
-  const timeStr = `${now.getDate()} ต.ค. ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-  const newMsg = {
-    id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    reportId,
-    senderRole: senderRole || 'reporter',
-    senderName: senderName || 'ผู้ใช้',
-    message: message.trim(),
-    timestamp: timeStr,
-    readByAdmin: senderRole === 'investigator'
-  };
-
-  serverMessages[reportId].push(newMsg);
-  broadcast({ type: 'new_message', reportId, message: newMsg }, reportId);
-
-  res.json({ success: true, message: newMsg });
 });
 
-// Mark messages as read by admin
+// Mark messages as read by admin - Real SQLite UPDATE
 app.post('/api/reports/:id/mark-read', (req, res) => {
-  const reportId = req.params.id;
-  if (serverMessages[reportId]) {
-    serverMessages[reportId].forEach((m: any) => {
-      if (m.senderRole === 'reporter') {
-        m.readByAdmin = true;
-      }
-    });
+  try {
+    const reportId = req.params.id.trim();
+    sqliteDb.markMessagesAsRead(reportId);
     broadcast({ type: 'messages_read', reportId }, reportId);
+    res.json({ success: true, reportId });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to mark read' });
   }
-  res.json({ success: true, reportId });
+});
+
+// Audit Logs API - Real SQLite
+app.get('/api/audit-logs', (req, res) => {
+  try {
+    const logs = sqliteDb.getAuditLogs();
+    res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+app.post('/api/audit-logs', (req, res) => {
+  try {
+    const { userName, action, status, ipAddress } = req.body;
+    sqliteDb.addAuditLog(userName || 'User', action || 'Action', status || 'Success', ipAddress);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to write audit log' });
+  }
+});
+
+// Database Management & Inspector APIs (SQLite 3 Live Monitor)
+app.get('/api/db/status', (req, res) => {
+  try {
+    const status = sqliteDb.getDatabaseStatus();
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get SQLite status', details: err?.message });
+  }
+});
+
+app.post('/api/db/query', (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'กรุณาระบุคำสั่ง SQL query' });
+    }
+    const result = sqliteDb.executeSqlSafe(query);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'SQL execution failed' });
+  }
+});
+
+app.post('/api/db/reset', (req, res) => {
+  try {
+    const status = sqliteDb.resetDatabaseToSeed();
+    const reports = sqliteDb.getAllReports();
+    reports.forEach(r => broadcast({ type: 'report_updated', report: r }));
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to reset database' });
+  }
 });
 
 // Start Server and attach WebSocket
@@ -451,20 +451,13 @@ async function startServer() {
           conn.caseId = undefined;
         } else if (data.type === 'mark_read') {
           const { reportId } = data;
-          if (reportId && serverMessages[reportId]) {
-            serverMessages[reportId].forEach((m: any) => {
-              if (m.senderRole === 'reporter') {
-                m.readByAdmin = true;
-              }
-            });
+          if (reportId) {
+            sqliteDb.markMessagesAsRead(reportId);
             broadcast({ type: 'messages_read', reportId }, reportId);
           }
         } else if (data.type === 'chat_message') {
           const { reportId, senderRole, senderName, message } = data;
           if (reportId && message) {
-            if (!serverMessages[reportId]) {
-              serverMessages[reportId] = [];
-            }
             const now = new Date();
             const timeStr = `${now.getDate()} ต.ค. ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             const newMsg = {
@@ -476,7 +469,7 @@ async function startServer() {
               timestamp: timeStr,
               readByAdmin: senderRole === 'investigator'
             };
-            serverMessages[reportId].push(newMsg);
+            sqliteDb.insertMessage(newMsg);
             broadcast({ type: 'new_message', reportId, message: newMsg }, reportId);
           }
         } else if (data.type === 'typing') {
@@ -489,26 +482,16 @@ async function startServer() {
         } else if (data.type === 'report_update') {
           const { report } = data;
           if (report && report.id) {
-            const id = report.id.trim().toLowerCase();
-            const idx = serverReports.findIndex(r => r.id.toLowerCase() === id);
-            if (idx !== -1) {
-              serverReports[idx] = { ...serverReports[idx], ...report, updatedAt: new Date().toISOString() };
-            } else {
-              serverReports.unshift(report);
+            const updated = sqliteDb.updateReport(report.id, report);
+            if (updated) {
+              broadcast({ type: 'report_updated', report: updated });
             }
-            const updated = serverReports[idx] || report;
-            broadcast({ type: 'report_updated', report: updated });
           }
         } else if (data.type === 'report_delete') {
           const { reportId } = data;
           if (reportId) {
-            const id = reportId.trim().toLowerCase();
-            const idx = serverReports.findIndex(r => r.id.toLowerCase() === id);
-            if (idx !== -1) {
-              const deleted = serverReports.splice(idx, 1)[0];
-              delete serverMessages[deleted.id];
-              broadcast({ type: 'report_deleted', reportId: deleted.id });
-            }
+            sqliteDb.deleteReport(reportId);
+            broadcast({ type: 'report_deleted', reportId });
           }
         } else if (data.type === 'ping') {
           ws.send(JSON.stringify({ type: 'pong' }));

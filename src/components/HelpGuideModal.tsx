@@ -314,12 +314,27 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({
                   pip install flask flask-cors<br />
                   python app.py
                 </div>
+                <p className="font-bold text-rose-400 font-sans text-xs pt-2">🧪 วิธีรันการทดสอบอัตโนมัติ (Selenium Python E2E Testing - 68 Cases)</p>
+                <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-slate-300 space-y-2">
+                  <p className="text-amber-300 font-sans font-bold">1. ติดตั้ง Dependencies และ Chromium:</p>
+                  <div>sudo apt-get install -y python3-pip chromium chromium-driver</div>
+                  <div>pip install -r tests/requirements.txt</div>
+                  
+                  <p className="text-amber-300 font-sans font-bold pt-1">2. รันการทดสอบทั้งหมดของทุกคน (68 Cases):</p>
+                  <div>python3 tests/run_tests.py --tester all</div>
+                  
+                  <p className="text-amber-300 font-sans font-bold pt-1">3. รันแยกตามผู้ทดสอบแต่ละคน:</p>
+                  <div>python3 tests/run_tests.py --tester watcharakorn  # วัชรากร (30 Cases)</div>
+                  <div>python3 tests/run_tests.py --tester suttichai     # วุฒิชัย (23 Cases)</div>
+                  <div>python3 tests/run_tests.py --tester saharat       # สหรัฐ (10 Cases)</div>
+                  <div>python3 tests/run_tests.py --tester athip         # อธิป (5 Cases)</div>
+                </div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-                <h4 className="font-bold text-slate-900 text-xs">เอกสาร README.md ในโปรเจกต์</h4>
-                <p className="text-slate-600 text-[11px]">
-                  ไฟล์ <code>README.md</code> ถูกจัดทำไว้ที่รากของโปรเจกต์เรียบร้อยแล้ว ท่านสามารถเปิดอ่านหรือ Export โปรเจกต์ผ่านเมนู Settings ของ Google AI Studio เพื่อนำไปใช้งานได้อย่างสมบูรณ์แบบ
+                <h4 className="font-bold text-slate-900 text-xs">เอกสาร README.md และเอกสารใน docs/</h4>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  ไฟล์ <code>README.md</code>, <code>tests/README.md</code> และข้อกำหนดในโฟลเดอร์ <code>docs/</code> (Funtional Requirements, Annonymous-Test-Cases.docx, Annonymous-Test-Plan-and-Report.docx) ถูกจัดเตรียมไว้อย่างครบถ้วน 100% พร้อมกรณีทดสอบ 68 เคส
                 </p>
               </div>
             </div>

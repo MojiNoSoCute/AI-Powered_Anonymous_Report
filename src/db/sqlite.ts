@@ -1,14 +1,25 @@
 /**
- * TrustLine Portal - SQLite Database Engine
- * ระบบจัดการฐานข้อมูล SQLite สำหรับจัดเก็บและค้นหารายงาน, แชทลับ, ไฟล์หลักฐาน และ Audit Log
+ * TrustLine Portal - Real SQLite Database Client Engine
+ * ซิงค์ข้อมูลกับฐานข้อมูล SQLite จริงบนเซิร์ฟเวอร์ (data/trustline.db)
+ * รองรับ Full CRUD (Create, Read, Update, Delete) ผ่าน REST API และ WebSocket
  */
 
-import { ReportItem, ChatMessage, AuditLogItem, CategoryType, UrgencyLevel, ReportStatus, EvidenceFile } from '../types';
+import { 
+  ReportItem, 
+  ChatMessage, 
+  AuditLogItem, 
+  CategoryType, 
+  UrgencyLevel, 
+  ReportStatus, 
+  EvidenceFile,
+  DatabaseStatusInfo,
+  SqlQueryResult
+} from '../types';
 
-// Key for LocalStorage persistence of SQLite JSON state
-const STORAGE_KEY = 'trustline_sqlite_db_v1';
+// Key for LocalStorage persistence of optimistic state
+const STORAGE_KEY = 'trustline_sqlite_db_cache_v2';
 
-// Initial Mock Seed Data matching user screenshots
+// Initial Fallback Mock Seed Data in case network is offline
 const INITIAL_REPORTS: ReportItem[] = [
   {
     id: 'TL-8942-XCVB',
@@ -51,6 +62,32 @@ const INITIAL_REPORTS: ReportItem[] = [
         fileType: 'video/mp4',
         url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         uploadedAt: '2024-10-14 10:15'
+      }
+    ]
+  },
+  {
+    id: 'TL-1092-AABB',
+    pin: '1092',
+    category: 'harassment',
+    categoryLabelTh: 'การล่วงละเมิดและคุกคาม',
+    urgency: 'high',
+    incidentDate: '2024-10-16',
+    location: 'อาคารเฉลิมพระเกียรติ ชั้น 4',
+    description: 'มีพฤติกรรมการใช้วาจาคุกคามและข่มขู่ทางวาจาจากบุคคลในภาควิชา ทำให้รู้สึกไม่ปลอดภัยและได้รับผลกระทบทางจิตใจอย่างรุนแรง',
+    status: 'investigating',
+    statusLabelTh: 'กำลังตรวจสอบข้อเท็จจริง',
+    assignedTo: 'นิติกร ประวิทย์ (ฝ่ายวินัย)',
+    createdAt: '2024-10-16T10:15:00Z',
+    updatedAt: '2024-10-18T14:30:00Z',
+    evidenceFiles: [
+      {
+        id: 'ev-aabb-1',
+        reportId: 'TL-1092-AABB',
+        fileName: 'Chat_Evidence_Harassment.png',
+        fileSize: 420000,
+        fileType: 'image/png',
+        url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80',
+        uploadedAt: '2024-10-16 10:15'
       }
     ]
   },
@@ -159,6 +196,35 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
       timestamp: '14 ต.ค. 09:10',
       readByAdmin: true
     }
+  ],
+  'TL-1092-AABB': [
+    {
+      id: 'msg-aabb-1',
+      reportId: 'TL-1092-AABB',
+      senderRole: 'investigator',
+      senderName: 'นิติกร ประวิทย์',
+      message: 'สวัสดีครับ เจ้าหน้าที่ได้รับเรื่องร้องเรียนแล้ว ทางเรากำลังรวบรวมข้อมูลและจะรักษาความลับของคุณอย่างสูงสุด',
+      timestamp: '16 ต.ค. 11:30',
+      readByAdmin: true
+    },
+    {
+      id: 'msg-aabb-2',
+      reportId: 'TL-1092-AABB',
+      senderRole: 'reporter',
+      senderName: 'คุณ (ผู้แจ้ง)',
+      message: 'ขอบคุณครับ มีภาพหลักฐานข้อความแชทที่ถูกคุกคามแนบไว้ในระบบเรียบร้อยแล้วครับ',
+      timestamp: '16 ต.ค. 11:45',
+      readByAdmin: true
+    },
+    {
+      id: 'msg-aabb-3',
+      reportId: 'TL-1092-AABB',
+      senderRole: 'investigator',
+      senderName: 'นิติกร ประวิทย์',
+      message: 'ได้รับหลักฐานเรียบร้อยแล้วครับ คณะกรรมการกำลังดำเนินการตรวจสอบข้อเท็จจริงอย่างเร่งด่วนครับ',
+      timestamp: '18 ต.ค. 14:30',
+      readByAdmin: true
+    }
   ]
 };
 
@@ -199,28 +265,34 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
     id: 'log-5',
     dateTime: '2024-10-26 16:20:00',
     userName: 'System_Database',
-    action: 'SQLite Database Backup completed successfully',
+    action: 'SQLite Database persistent engine connected (data/trustline.db)',
     ipAddress: '127.0.0.1',
     status: 'Success'
   }
 ];
 
 class SQLiteDatabase {
-  private reports: ReportItem[];
-  private messages: Record<string, ChatMessage[]>;
-  private auditLogs: AuditLogItem[];
+  private reports: ReportItem[] = [];
+  private messages: Record<string, ChatMessage[]> = {};
+  private auditLogs: AuditLogItem[] = [];
+  private isServerSynced: boolean = false;
 
   constructor() {
-    // Load from local storage or initialize seed
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        this.reports = parsed.reports || INITIAL_REPORTS;
-        this.messages = parsed.messages || INITIAL_MESSAGES;
-        this.auditLogs = parsed.auditLogs || INITIAL_AUDIT_LOGS;
-      } catch (e) {
-        console.error('Failed to parse SQLite saved state:', e);
+    // 1. Load optimistic cache from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          this.reports = Array.isArray(parsed.reports) ? parsed.reports : INITIAL_REPORTS;
+          this.messages = parsed.messages || INITIAL_MESSAGES;
+          this.auditLogs = Array.isArray(parsed.auditLogs) ? parsed.auditLogs : INITIAL_AUDIT_LOGS;
+        } catch {
+          this.reports = INITIAL_REPORTS;
+          this.messages = INITIAL_MESSAGES;
+          this.auditLogs = INITIAL_AUDIT_LOGS;
+        }
+      } else {
         this.reports = INITIAL_REPORTS;
         this.messages = INITIAL_MESSAGES;
         this.auditLogs = INITIAL_AUDIT_LOGS;
@@ -229,53 +301,83 @@ class SQLiteDatabase {
       this.reports = INITIAL_REPORTS;
       this.messages = INITIAL_MESSAGES;
       this.auditLogs = INITIAL_AUDIT_LOGS;
+    }
+
+    // 2. Fetch fresh real data from SQLite backend
+    if (typeof window !== 'undefined') {
+      this.fetchFromServer();
+    }
+  }
+
+  public async fetchFromServer(): Promise<void> {
+    try {
+      const [resReports, resLogs] = await Promise.all([
+        fetch('/api/reports').then(r => r.ok ? r.json() : null),
+        fetch('/api/audit-logs').then(r => r.ok ? r.json() : null)
+      ]);
+
+      if (Array.isArray(resReports) && resReports.length > 0) {
+        this.reports = resReports;
+      }
+      if (Array.isArray(resLogs) && resLogs.length > 0) {
+        this.auditLogs = resLogs;
+      }
+
+      this.isServerSynced = true;
       this.persist();
+    } catch (err) {
+      console.warn('[SQLite Client] Background sync error, using cached state:', err);
     }
   }
 
   private persist() {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        reports: this.reports,
-        messages: this.messages,
-        auditLogs: this.auditLogs
-      })
-    );
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          reports: this.reports,
+          messages: this.messages,
+          auditLogs: this.auditLogs
+        })
+      );
+    } catch {}
   }
 
-  // --- Reports CRUD ---
+  // --- Reports CRUD Operations ---
+
   public getReports(): ReportItem[] {
-    return this.reports.map(r => ({ ...r, evidenceFiles: [...r.evidenceFiles] }));
+    return this.reports.map(r => ({ ...r, evidenceFiles: [...(r.evidenceFiles || [])] }));
   }
 
   public getReportById(id: string): ReportItem | undefined {
     const found = this.reports.find(r => r.id.toLowerCase() === id.trim().toLowerCase());
-    return found ? { ...found, evidenceFiles: [...found.evidenceFiles] } : undefined;
+    return found ? { ...found, evidenceFiles: [...(found.evidenceFiles || [])] } : undefined;
   }
 
   public getReportByIdAndPin(id: string, pin: string): ReportItem | undefined {
     const found = this.reports.find(
       r => r.id.toLowerCase() === id.trim().toLowerCase() && r.pin === pin.trim()
     );
-    return found ? { ...found, evidenceFiles: [...found.evidenceFiles] } : undefined;
+    return found ? { ...found, evidenceFiles: [...(found.evidenceFiles || [])] } : undefined;
   }
 
   public createReport(
-    data: Omit<ReportItem, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'statusLabelTh'>
+    data: Omit<ReportItem, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'statusLabelTh'>,
+    operator: string = 'Anonymous_User'
   ): ReportItem {
     const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
     const newId = `TL-2024-${randomHex}`;
     const now = new Date().toISOString();
 
     const categoryLabels: Record<CategoryType, string> = {
-      harassment: 'การล่วงละเมิด',
+      harassment: 'การล่วงละเมิดและคุกคาม',
       compliance: 'การปฏิบัติตามกฎระเบียบ',
       technical: 'ปัญหาทางเทคนิค/ความปลอดภัย',
       fraud: 'การทุจริตทางการเงิน',
-      safety: 'ความปลอดภัย/สิ่งแวดล้อม',
+      safety: 'ความปลอดภัยและสิ่งแวดล้อม',
       academic: 'การประพฤติผิดทางวิชาการ',
-      teaching: 'คุณภาพการสอน/อาจารย์ผู้สอน'
+      teaching: 'คุณภาพการสอน/รายงานเกี่ยวกับอาจารย์'
     };
 
     const newReport: ReportItem = {
@@ -286,19 +388,38 @@ class SQLiteDatabase {
       statusLabelTh: 'รับเรื่องแล้ว',
       assignedTo: 'รอเจ้าหน้าที่รับเรื่อง',
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      evidenceFiles: data.evidenceFiles || []
     };
 
+    // 1. Optimistic local update
     this.reports.unshift(newReport);
-    
-    // Add audit log
     this.addAuditLog(
-      'Anonymous_User',
-      `Created new encrypted report #${newId} (${newReport.categoryLabelTh})`,
+      operator,
+      `Created new encrypted report #${newId} (${newReport.categoryLabelTh}) in SQLite DB`,
       'Success'
     );
-
     this.persist();
+
+    // 2. Real SQLite backend POST
+    if (typeof window !== 'undefined') {
+      fetch('/api/reports', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-name': operator 
+        },
+        body: JSON.stringify(newReport)
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.report) {
+          this.syncReportFromServer(res.report);
+        }
+      })
+      .catch(err => console.error('[SQLite Client] POST /api/reports failed:', err));
+    }
+
     return newReport;
   }
 
@@ -322,8 +443,20 @@ class SQLiteDatabase {
       `Updated Case #${reportId} status to '${statusLabels[newStatus]}'`,
       'Success'
     );
-
     this.persist();
+
+    // Sync to Real SQLite backend
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${report.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-name': userName 
+        },
+        body: JSON.stringify(report)
+      }).catch(err => console.error('[SQLite Client] PUT /api/reports failed:', err));
+    }
+
     return true;
   }
 
@@ -372,6 +505,40 @@ class SQLiteDatabase {
 
     this.addAuditLog(userName, `Edited details for Case #${reportId}`, 'Success');
     this.persist();
+
+    // Sync to Real SQLite backend
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${report.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-name': userName 
+        },
+        body: JSON.stringify(report)
+      }).catch(err => console.error('[SQLite Client] PUT /api/reports failed:', err));
+    }
+
+    return true;
+  }
+
+  public deleteReport(reportId: string, userName: string = 'Admin'): boolean {
+    const idx = this.reports.findIndex(r => r.id.toLowerCase() === reportId.toLowerCase());
+    if (idx === -1) return false;
+
+    this.reports.splice(idx, 1);
+    delete this.messages[reportId];
+
+    this.addAuditLog(userName, `Withdrew/Deleted Report #${reportId}`, 'Success');
+    this.persist();
+
+    // Sync to Real SQLite backend
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${reportId}`, {
+        method: 'DELETE',
+        headers: { 'x-user-name': userName }
+      }).catch(err => console.error('[SQLite Client] DELETE /api/reports failed:', err));
+    }
+
     return true;
   }
 
@@ -394,19 +561,8 @@ class SQLiteDatabase {
     }
   }
 
-  public deleteReport(reportId: string, userName: string = 'Admin'): boolean {
-    const idx = this.reports.findIndex(r => r.id.toLowerCase() === reportId.toLowerCase());
-    if (idx === -1) return false;
+  // --- Evidence Files Operations ---
 
-    this.reports.splice(idx, 1);
-    delete this.messages[reportId];
-
-    this.addAuditLog(userName, `Withdrew/Deleted Report #${reportId}`, 'Success');
-    this.persist();
-    return true;
-  }
-
-  // --- Evidence Files ---
   public addEvidence(reportId: string, file: EvidenceFile, userName: string = 'User'): boolean {
     const report = this.reports.find(r => r.id.toLowerCase() === reportId.trim().toLowerCase());
     if (!report) return false;
@@ -416,6 +572,18 @@ class SQLiteDatabase {
 
     this.addAuditLog(userName, `Uploaded evidence '${file.fileName}' for Case #${reportId}`, 'Success');
     this.persist();
+
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${reportId}/evidence`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-name': userName 
+        },
+        body: JSON.stringify(file)
+      }).catch(err => console.error('[SQLite Client] POST evidence failed:', err));
+    }
+
     return true;
   }
 
@@ -432,11 +600,32 @@ class SQLiteDatabase {
 
     this.addAuditLog(userName, `Deleted evidence '${fileName}' from Case #${reportId}`, 'Success');
     this.persist();
+
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${reportId}/evidence/${evidenceId}`, {
+        method: 'DELETE',
+        headers: { 'x-user-name': userName }
+      }).catch(err => console.error('[SQLite Client] DELETE evidence failed:', err));
+    }
+
     return true;
   }
 
-  // --- Secret Chat Messages ---
+  // --- Secret Chat Messages Operations ---
+
   public getMessages(reportId: string): ChatMessage[] {
+    // If not cached, trigger fetch
+    if (!this.messages[reportId] && typeof window !== 'undefined') {
+      fetch(`/api/reports/${reportId}/messages`)
+        .then(r => r.ok ? r.json() : [])
+        .then(list => {
+          if (Array.isArray(list)) {
+            this.messages[reportId] = list;
+            this.persist();
+          }
+        })
+        .catch(() => {});
+    }
     return this.messages[reportId] ? [...this.messages[reportId]] : [];
   }
 
@@ -468,6 +657,9 @@ class SQLiteDatabase {
 
     if (modified) {
       this.persist();
+      if (typeof window !== 'undefined') {
+        fetch(`/api/reports/${reportId}/mark-read`, { method: 'POST' }).catch(() => {});
+      }
     }
     return modified;
   }
@@ -491,18 +683,27 @@ class SQLiteDatabase {
     };
 
     this.messages[reportId].push(newMsg);
-
     this.addAuditLog(
       senderName,
       `Sent encrypted message in secret channel for Case #${reportId}`,
       'Success'
     );
-
     this.persist();
+
+    // Real SQLite backend POST
+    if (typeof window !== 'undefined') {
+      fetch(`/api/reports/${reportId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderRole, senderName, message: text })
+      }).catch(err => console.error('[SQLite Client] POST message failed:', err));
+    }
+
     return newMsg;
   }
 
-  // --- Audit Logs ---
+  // --- Audit Logs Operations ---
+
   public getAuditLogs(): AuditLogItem[] {
     return [...this.auditLogs];
   }
@@ -522,14 +723,54 @@ class SQLiteDatabase {
 
     this.auditLogs.unshift(newLog);
     this.persist();
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/audit-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLog)
+      }).catch(() => {});
+    }
   }
 
-  // Clear or Reset to defaults
-  public resetToDefaultSeed(): void {
-    this.reports = INITIAL_REPORTS;
-    this.messages = INITIAL_MESSAGES;
-    this.auditLogs = INITIAL_AUDIT_LOGS;
-    this.persist();
+  // --- Real SQLite Database Server Inspections ---
+
+  public async getDatabaseStatus(): Promise<DatabaseStatusInfo | null> {
+    try {
+      const res = await fetch('/api/db/status');
+      if (!res.ok) throw new Error('Failed to query SQLite server status');
+      return await res.json();
+    } catch (err) {
+      console.error('[SQLite Client] getDatabaseStatus error:', err);
+      return null;
+    }
+  }
+
+  public async executeSqlQuery(query: string): Promise<SqlQueryResult> {
+    const res = await fetch('/api/db/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'SQL query failed');
+    }
+    return await res.json();
+  }
+
+  public async resetToDefaultSeed(): Promise<void> {
+    try {
+      const res = await fetch('/api/db/reset', { method: 'POST' });
+      if (res.ok) {
+        await this.fetchFromServer();
+      }
+    } catch {
+      this.reports = INITIAL_REPORTS;
+      this.messages = INITIAL_MESSAGES;
+      this.auditLogs = INITIAL_AUDIT_LOGS;
+      this.persist();
+    }
   }
 }
 

@@ -96,3 +96,28 @@ export type WsServerEvent =
   | { type: 'report_created'; report: ReportItem }
   | { type: 'report_deleted'; reportId: string }
   | { type: 'pong' };
+
+export interface DatabaseStatusInfo {
+  engine: string;
+  dbPath: string;
+  absolutePath: string;
+  fileSizeBytes: number;
+  walSizeBytes: number;
+  fileSizeFormatted: string;
+  tableCounts: {
+    reports: number;
+    messages: number;
+    evidenceFiles: number;
+    auditLogs: number;
+  };
+  pragmaIntegrity: string;
+  journalMode: string;
+  lastUpdated: string;
+}
+
+export interface SqlQueryResult {
+  columns: string[];
+  rows: any[];
+  rowCount: number;
+  executionTimeMs: number;
+}

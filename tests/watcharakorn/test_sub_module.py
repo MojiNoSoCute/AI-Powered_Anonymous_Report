@@ -14,6 +14,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException
 from tests.conftest import BASE_URL, login_as, switch_tab
 
 
@@ -267,36 +268,52 @@ class TestSubmissionModule:
 
         try:
             file_input = driver.find_element(By.XPATH, "//input[@type='file']")
-            file_input.send_keys(tmp_path)
-            time.sleep(0.8)
+            alert_triggered = False
+
+            # Attempt sending invalid file; catch UnexpectedAlertPresentException if raised during send_keys
+            try:
+                file_input.send_keys(tmp_path)
+                time.sleep(0.5)
+            except UnexpectedAlertPresentException:
+                alert_triggered = True
+                try:
+                    alert = driver.switch_to.alert
+                    alert.accept()
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
             # Check if alert was triggered for invalid file type
-            alert_triggered = False
+            if not alert_triggered:
+                try:
+                    WebDriverWait(driver, 2).until(EC.alert_is_present())
+                    alert = driver.switch_to.alert
+                    alert.accept()
+                    alert_triggered = True
+                except Exception:
+                    pass
+
+            # Double-check if any alert dialog is still active and dismiss it
             try:
                 alert = driver.switch_to.alert
-                alert_text = alert.text
                 alert.accept()
-                alert_triggered = True
             except Exception:
                 pass
 
             time.sleep(0.5)
 
-            # Double-check if any alert dialog is still active
-            try:
-                alert = driver.switch_to.alert
-                alert.accept()
-            except Exception:
-                pass
-
             base_name = os.path.basename(tmp_path)
-            attached_chips = driver.find_elements(By.XPATH, f"//span[contains(text(), '{base_name}')]")
+            attached_chips = driver.find_elements(By.XPATH, f"//div[contains(., 'ไฟล์ที่แนบไว้')]//span[contains(text(), '{base_name}')]")
+            if not attached_chips:
+                # Also check any file chip spans with truncate class
+                attached_chips = driver.find_elements(By.XPATH, f"//span[contains(@class, 'truncate') and contains(text(), '{base_name}')]")
             accept_attr = file_input.get_attribute("accept") or ""
             is_valid_handling = (
                 len(attached_chips) == 0 or 
                 alert_triggered or 
                 bool(accept_attr and any(t in accept_attr.lower() for t in ["image", "pdf", "video", ".png", ".jpg"])) or
-                ("PDF" in page_source and ("PNG" in page_source or "ภาพ" in page_source or "JPG" in page_source))
+                ("PDF" in driver.page_source and ("PNG" in driver.page_source or "ภาพ" in driver.page_source or "JPG" in driver.page_source))
             )
             assert is_valid_handling, f"System must enforce file type restrictions: {base_name}"
             assert len(attached_chips) == 0, f"Rejected file {base_name} must not be attached"

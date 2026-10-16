@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { CategoryType, UrgencyLevel, EvidenceFile, UserSession } from '../types';
 import { db } from '../db/sqlite';
+import { realtimeService } from '../services/realtime';
 import { analyzeReportWithRealAI, analyzeReportWithAI, AIAnalysisResult } from '../lib/aiAnalyzer';
 
 interface SubmitReportProps {
@@ -32,12 +33,15 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [createdReportInfo, setCreatedReportInfo] = useState<{ id: string; pin: string } | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string>('');
 
   // AI Categorization State
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [aiApplied, setAiApplied] = useState<boolean>(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const latestDescRef = useRef<string>(description);
+  latestDescRef.current = description;
 
   const handleRunAIAnalysis = async (targetText?: string, targetLoc?: string, isAuto: boolean = false) => {
     const textToAnalyze = targetText !== undefined ? targetText : description;
@@ -55,10 +59,12 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
 
     try {
       const result = await analyzeReportWithRealAI(textToAnalyze, locToAnalyze);
-      setAiResult(result);
-      setCategory(result.category);
-      setUrgency(result.urgency || 'low');
-      setAiApplied(true);
+      if (latestDescRef.current.trim().length > 0) {
+        setAiResult(result);
+        setCategory(result.category);
+        setUrgency(result.urgency || 'low');
+        setAiApplied(true);
+      }
     } catch (err) {
       console.error('Error during AI Analysis:', err);
     } finally {
@@ -118,11 +124,54 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
 
     if (!selectedFiles || selectedFiles.length === 0) return;
 
+    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.pdf', '.mp4'];
+    const disallowedExtensions = ['.exe', '.bat', '.cmd', '.sh', '.msi', '.bin', '.dll', '.com', '.scr', '.vbs', '.js', '.jar', '.py', '.php'];
+    const validFiles: File[] = [];
+
+    for (const file of Array.from(selectedFiles)) {
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+      const isExplicitlyDisallowed = disallowedExtensions.includes(ext);
+      const isAllowedExt = allowedExtensions.includes(ext);
+      const isAllowedMime = file.type === 'application/pdf' || 
+                            file.type.startsWith('video/') || 
+                            file.type.startsWith('image/');
+
+      const isValid = !isExplicitlyDisallowed && (isAllowedExt || isAllowedMime);
+
+      if (!isValid) {
+        const errorMsg = 'รูปแบบไฟล์ไม่ถูกต้อง: รองรับเฉพาะไฟล์ภาพ (PNG, JPG), เอกสาร (PDF) หรือวิดีโอ (MP4) เท่านั้น';
+        setUploadError(errorMsg);
+        try {
+          alert(`ไฟล์ ${file.name} ไม่ถูกต้อง: รองรับเฉพาะไฟล์ภาพ (PNG, JPG), เอกสาร (PDF) หรือวิดีโอ (MP4) เท่านั้น`);
+        } catch {
+          // Ignore alert exceptions
+        }
+        if ('target' in e && e.target) {
+          try { (e.target as HTMLInputElement).value = ''; } catch {}
+        }
+        return;
+      }
+      validFiles.push(file);
+    }
+
+    setUploadError('');
+
+    // Calculate current total size + incoming size
+    const currentSize = files.reduce((acc, f) => acc + (f.fileSize || 0), 0);
+    let incomingSize = 0;
+    validFiles.forEach(f => { incomingSize += f.size; });
+
+    const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+    if (currentSize + incomingSize > MAX_SIZE_BYTES) {
+      alert('ขนาดไฟล์รวมเกินขีดจำกัด 50MB ไม่สามารถแนบไฟล์เพิ่มได้');
+      return;
+    }
+
     setIsUploading(true);
 
     const newEvidenceList: EvidenceFile[] = [];
-    Array.from(selectedFiles).forEach((file, index) => {
-      const isImage = file.type.startsWith('image/');
+    validFiles.forEach((file, index) => {
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
       // Create object URL or fallback mock URL for preview table
       const previewUrl = isImage 
         ? URL.createObjectURL(file) 
@@ -142,7 +191,7 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
     setTimeout(() => {
       setFiles(prev => [...prev, ...newEvidenceList]);
       setIsUploading(false);
-    }, 600);
+    }, 400);
   };
 
   const removeFile = (id: string) => {
@@ -173,6 +222,9 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
       description,
       evidenceFiles: files
     });
+
+    // Broadcast in real-time to SQLite database and connected staff
+    realtimeService.sendReportCreate(created);
 
     setCreatedReportInfo({ id: created.id, pin: generatedPin });
     setShowSuccessModal(true);
@@ -465,6 +517,7 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
               <input
                 type="file"
                 multiple
+                accept=".png,.jpg,.jpeg,.pdf,.mp4,image/png,image/jpeg,application/pdf,video/mp4"
                 onChange={handleFileUpload}
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
@@ -478,6 +531,23 @@ export const SubmitReport: React.FC<SubmitReportProps> = ({ onSuccessSubmit, use
                 รองรับไฟล์ภาพ เอกสาร PDF, PNG, JPG (สูงสุด 50MB)
               </p>
             </div>
+
+            {/* Upload Error Banner */}
+            {uploadError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                  <p className="font-medium">{uploadError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUploadError('')}
+                  className="text-red-400 hover:text-red-700 font-bold text-xs p-1 rounded-md hover:bg-red-100/50 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             {/* Evidence List */}
             {files.length > 0 && (

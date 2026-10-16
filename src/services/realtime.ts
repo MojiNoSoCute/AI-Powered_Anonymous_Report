@@ -148,6 +148,23 @@ class RealtimeService {
     }
   }
 
+  public sendReportCreate(report: ReportItem): void {
+    // 1. Sync local DB
+    db.syncReportFromServer(report);
+
+    // 2. Notify local listeners
+    this.reportUpdateListeners.forEach(cb => cb(report));
+
+    // 3. Send WebSocket event
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const payload: any = {
+        type: 'report_created',
+        report
+      };
+      this.ws.send(JSON.stringify(payload));
+    }
+  }
+
   public sendReportUpdate(report: ReportItem): void {
     // 1. Sync local DB
     db.syncReportFromServer(report);

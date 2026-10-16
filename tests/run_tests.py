@@ -90,10 +90,20 @@ def main():
         default="all",
         help="Specify which team member's test suite to run"
     )
+    default_url = os.environ.get("TEST_BASE_URL", "")
+    if not default_url:
+        try:
+            import urllib.request
+            with urllib.request.urlopen("http://localhost:3000", timeout=0.6) as resp:
+                if resp.status == 200:
+                    default_url = "http://localhost:3000"
+        except Exception:
+            default_url = "https://anonymous-report.ai.studio/"
+
     parser.add_argument(
         "--url",
-        default=os.environ.get("TEST_BASE_URL", "https://anonymous-report.ai.studio/"),
-        help="Target Web Application URL (default: https://anonymous-report.ai.studio/)"
+        default=default_url or "https://anonymous-report.ai.studio/",
+        help="Target Web Application URL (default: http://localhost:3000 if active, else https://anonymous-report.ai.studio/)"
     )
     parser.add_argument(
         "--headed",

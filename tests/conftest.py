@@ -28,7 +28,23 @@ from selenium.webdriver.common.keys import Keys
 
 # Target Real Web Application URL
 REAL_WEB_URL = "https://anonymous-report.ai.studio/"
-BASE_URL = os.environ.get("TEST_BASE_URL", REAL_WEB_URL).rstrip("/")
+
+
+def get_default_base_url():
+    env_url = os.environ.get("TEST_BASE_URL")
+    if env_url and env_url.strip():
+        return env_url.strip().rstrip("/")
+    try:
+        import urllib.request
+        with urllib.request.urlopen("http://localhost:3000", timeout=0.6) as response:
+            if response.status == 200:
+                return "http://localhost:3000"
+    except Exception:
+        pass
+    return REAL_WEB_URL.rstrip("/")
+
+
+BASE_URL = get_default_base_url()
 CHROMEDRIVER_PATH = os.environ.get("CHROMEDRIVER_PATH", "").strip()
 
 

@@ -1,16 +1,76 @@
 services:
-  app:
+  # ===========================================================================
+  # 1. Frontend Service: React 19 Single Page App served by High-Performance Nginx
+  # ===========================================================================
+  frontend:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: npru-sentinel-app
+      dockerfile: Dockerfile.frontend
+    container_name: trustline-frontend
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - trustline-net
+
+  # ===========================================================================
+  # 2. Backend Service: Node.js Express + WebSockets + Gemini AI API Server
+  # ===========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: trustline-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
     environment:
       - NODE_ENV=production
-      - PORT=3000
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - APP_URL=${APP_URL:-http://localhost:3000}
-    env_file:
-      - .env
+      - PORT=5001
+      - DATA_DIR=/data
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    volumes:
+      - sqlite-data:/data
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - trustline-net
+
+  # ===========================================================================
+  # 3. Database Service: PostgreSQL Database Server with Persistent Storage
+  # ===========================================================================
+  database:
+    image: postgres:16-alpine
+    container_name: trustline-database
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-trustline}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password123}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./schema.postgres.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-trustline}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - trustline-net
+
+volumes:
+  sqlite-data:
+    driver: local
+  postgres-data:
+    driver: local
+
+networks:
+  trustline-net:
+    driver: bridge

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -519,10 +520,22 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      app.get('/', (req, res) => {
+        res.json({
+          status: 'ok',
+          service: 'TrustLine Sentinel Backend API & WebSocket Server',
+          version: '1.0.0',
+          endpoints: ['/api/reports', '/api/audit-logs', '/ws'],
+          timestamp: new Date().toISOString()
+        });
+      });
+    }
   }
 
   server.listen(PORT, '0.0.0.0', () => {

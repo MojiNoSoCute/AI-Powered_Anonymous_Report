@@ -214,7 +214,31 @@ python -m pytest tests/test_portal_10_cases.py -v
 
 หากต้องการเปิดเซิร์ฟเวอร์ Local ขึ้นมาใช้งานหรือทดสอบ:
 
-### แบบที่ 1: Node.js Full-Stack (แนะนำ)
+### 🐳 แบบที่ 1: รันด้วย Docker Compose (3-Tier Production Stack แนะนำสูงสุด)
+สั่งรันทั้ง 3 คอนเทนเนอร์ (Frontend, Backend, Database) ให้ทำงานร่วมกันแบบสมบูรณ์ด้วยคำสั่งเดียว:
+
+```bash
+# 1. บิลด์และสตาร์ตทั้ง 3 คอนเทนเนอร์พร้อมกัน
+docker compose up -d
+
+# 2. ตรวจสอบสถานะการทำงานและความพร้อม (Health Check)
+docker compose ps
+
+# 3. ดู Log การทำงานแบบเรียลไทม์
+docker compose logs -f
+```
+
+| คอนเทนเนอร์ (Container) | บริการ (Service) | พอร์ต (Host:Container) | รายละเอียดหน้าที่ |
+| :--- | :--- | :---: | :--- |
+| **`trustline-frontend`** | **Frontend (React 19 + Nginx)** | `3000:80` | ให้บริการหน้าเว็บ Single Page App, Reverse Proxy `/api/` และ WebSocket `/ws` |
+| **`trustline-backend`** | **Backend (Node.js Express + ws)** | `5001:5001` | ให้บริการ REST API, Real-time Sync, คัดกรองด้วย Gemini AI และจัดการสำนวน |
+| **`trustline-database`** | **Database (PostgreSQL 16)** | `5432:5432` | เซิร์ฟเวอร์ฐานข้อมูลพร้อม Persistent Volume (`postgres-data`) และ Init Schema |
+
+🌐 **เปิดเว็บเบราว์เซอร์เข้าใช้งานระบบได้ทันทีที่**: **`http://localhost:3000`**
+
+---
+
+### แบบที่ 2: Node.js Full-Stack (Local Development)
 ```bash
 # 1. ติดตั้ง Node Dependencies
 npm install
@@ -227,7 +251,7 @@ npm start
 ```
 เปิดใช้งานได้ทันทีที่: **`http://localhost:3000`**
 
-### แบบที่ 2: Python Flask Backend
+### แบบที่ 3: Python Flask Backend
 ```bash
 # ติดตั้ง Flask
 pip install flask flask-cors

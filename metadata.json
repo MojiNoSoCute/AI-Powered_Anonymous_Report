@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix Remix Remix Anonymous Report Portal",
+  "description": "ระบบแจ้งเบาะแสและจัดการข้อมูลอย่างเป็นระบบ ปลอดภัย และเข้ารหัส พร้อมระบบติดตามสถานะ แชทลับ และแดชบอร์ดวิเคราะห์ข้อมูล",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

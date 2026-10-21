@@ -7,6 +7,7 @@
 **TrustLine / NPRU Sentinel** เป็นระบบเว็บแอปพลิเคชันสำหรับรับแจ้งเรื่องร้องเรียน เบาะแส และปัญหาภายในมหาวิทยาลัยราชภัฏนครปฐม โดยให้ความสำคัญสูงสุดกับ **ความปลอดภัย ความเป็นนิรนาม (100% Anonymity) และการปกป้องตัวตนของผู้แจ้ง** พร้อมด้วยระบบผู้ช่วยอัจฉริยะ (AI Smart Assistant) ที่ช่วยวิเคราะห์หมวดหมู่ ประเมินระดับความเร่งด่วน สรุปเนื้อหาเบื้องต้น และระบบบริหารจัดการสำนวนคดีสำหรับผู้ดูแลระบบ (Admin) แบบครบวงจร
 
 - 🌐 **เว็บไซต์ระบบจริง (Live Web Application):** [https://anonymous-report.ai.studio](https://anonymous-report.ai.studio)
+- 🐳 **เว็บแอปพลิเคชันในเครื่อง (Local Docker):** [http://localhost:3000](http://localhost:3000)
 - 🧪 **เทคโนโลยีทดสอบอัตโนมัติ (Automated E2E Testing):** Selenium Python (Python 3.10+, Selenium WebDriver 4.x, Pytest 8.x/9.x)
 
 ---
@@ -27,16 +28,95 @@
    - **เปลี่ยนสถานะคดีทันที (Status Selector):** ปรับเปลี่ยนสถานะคดี (รับเรื่องแล้ว, กำลังตรวจสอบ, ดำเนินการทางวินัย, ยุติเรื่อง)
    - **ลบรายงาน (Secure Delete):** มีกล่องยืนยันก่อนลบ ป้องกันการกดลบโดยไม่ได้ตั้งใจ
 
-4. **🐍 สถาปัตยกรรมแบบ Dual Backend**
-   - **Full-Stack Node.js (React 19 + TypeScript + Vite + Tailwind CSS + Express + SQLite3 + WebSockets)** บนพอร์ต `3000`
-   - **Python Backend Alternative (Flask + SQLite `app.py`, `schema.sql`)** บนพอร์ต `5000`
+4. **🤖 ระบบผู้ช่วย AI อัจฉริยะ (Gemini AI Smart Assistant)**
+   - วิเคราะห์หมวดหมู่และความเร่งด่วนของเรื่องร้องเรียนโดยอัตโนมัติ
+   - ฟังก์ชันแปลงเสียงพูดเป็นข้อความ (Speech-to-Text) อำนวยความสะดวกในการแจ้งเบาะแส
+
+---
+
+## 🛠️ สถาปัตยกรรมและเทคโนโลยีที่ใช้ (Tech Stack)
+
+### 🎨 1. Frontend (ส่วนหน้าเว็บ)
+* **Core Framework**: [React 19](package.json) (`react: ^19.0.1`, `react-dom: ^19.0.1`)
+* **Language**: [TypeScript](package.json) (`typescript: ~5.8.2`)
+* **Build Tool / Bundler**: [Vite 6](package.json) (`vite: ^6.2.3`) ร่วมกับ [esbuild](package.json)
+* **Styling**: [Tailwind CSS v4](package.json) (`@tailwindcss/vite: ^4.1.14`)
+* **UI Icons**: [Lucide React](package.json) (`lucide-react: ^0.546.0`)
+* **Animation**: [Motion](package.json) (`motion: ^12.23.24` แอนิเมชันรุ่นใหม่สืบทอดจาก Framer Motion)
+
+### ⚙️ 2. Backend (สถาปัตยกรรม Dual Backend)
+* **Primary Backend (Node.js Full-Stack)** — [`server.ts`](server.ts):
+  - **Runtime**: Node.js 22+ (รองรับ `node:sqlite` DatabaseSync)
+  - **Web Framework**: Express 4 (`express: ^4.21.2`)
+  - **Real-time Communication**: WebSockets (`ws: ^8.21.3`) สำหรับระบบห้องสนทนาลับ (Secret Chat) และ Real-time Sync
+  - **Generative AI**: [`@google/genai`](package.json) (`^2.4.0`) เชื่อมต่อโมเดล Gemini 2.5 Flash
+* **Alternative Backend (Python Flask)** — [`app.py`](app.py):
+  - พัฒนาด้วย Python Flask + SQLite สำหรับรันเป็นบริการแบบ Standalone
+
+### 🗄️ 3. Database & Storage (ระบบฐานข้อมูล)
+* **Production Database**: PostgreSQL 16 Alpine ([`schema.postgres.sql`](schema.postgres.sql)) พร้อม Persistent Docker Volume
+* **Embedded Database**: SQLite3 (Node.js `DatabaseSync` ในโหมด WAL / [`schema.sql`](schema.sql))
+* **File Storage**: Local Filesystem (`uploads/`) รองรับไฟล์ภาพและเอกสารขนาดสูงสุด 50MB
+
+### 🐳 4. Infrastructure & Containerization
+* **Docker & Docker Compose**: จัดการ 3-Tier Container Architecture แบบแยกอิสระ
+* **Web Server & Reverse Proxy**: Nginx Alpine ([`nginx.conf`](nginx.conf)) จัดการ SPA Routing, Gzip, และ Reverse Proxy ไปยัง Backend
+
+### 🧪 5. Automated Testing & QA
+* **E2E Test Engine**: Selenium WebDriver (Python 3)
+* **Test Runner**: Pytest 8.x/9.x + `pytest-html`
+* **Evidence Collection**: ระบบแคปเจอร์ภาพหน้าจออัตโนมัติจัดเก็บในโฟลเดอร์ [`screenshots/`](screenshots/)
+
+---
+
+## 🐳 การใช้งานจริงด้วย Docker Compose (3-Tier Production Stack)
+
+โปรเจกต์รองรับการรันผ่าน Docker Compose ครอบคลุมทั้ง 3 คอนเทนเนอร์หลักในคำสั่งเดียว:
+
+```mermaid
+flowchart TD
+    User["🌐 ผู้ใช้งาน (Browser)"] -->|พอร์ต 3000| Frontend["1. trustline-frontend (React 19 + Nginx)"]
+    Frontend -->|Static Files / SPA| User
+    Frontend -->|Reverse Proxy /api/ & /ws| Backend["2. trustline-backend (Node.js Express + ws)"]
+    Backend -->|Persistent Storage /data| SQLiteVol[("sqlite-data Volume")]
+    Backend -.->|Database Connection 5432| Database["3. trustline-database (PostgreSQL 16)"]
+    Database -->|Persistent Storage| PostgresVol[("postgres-data Volume")]
+```
+
+| คอนเทนเนอร์ (Container) | บริการ (Service) | พอร์ต (Host : Container) | สถานะ | รายละเอียดหน้าที่ |
+| :--- | :--- | :---: | :---: | :--- |
+| **`trustline-frontend`** | **Frontend (React 19 + Nginx)** | `3000:80` | **Healthy** ✅ | ให้บริการหน้าเว็บ Single Page App, Reverse Proxy `/api/` และ WebSocket `/ws` |
+| **`trustline-backend`** | **Backend (Node.js Express + ws)** | `5001:5001` | **Healthy** ✅ | ให้บริการ REST API, Real-time Sync, คัดกรองด้วย Gemini AI และจัดการสำนวน |
+| **`trustline-database`** | **Database (PostgreSQL 16)** | `5432:5432` | **Healthy** ✅ | เซิร์ฟเวอร์ฐานข้อมูลพร้อม Persistent Volume (`postgres-data`) และ Initial Schema |
+
+### 🚀 คำสั่ง Docker Compose ที่ใช้งานบ่อย:
+
+```bash
+# 1. บิลด์และสตาร์ตทั้ง 3 คอนเทนเนอร์พร้อมกันในโหมด Background
+docker compose up -d
+
+# 2. ตรวจสอบสถานะการทำงานและความพร้อม (Health Check)
+docker compose ps
+
+# 3. ดู Log การทำงานของทุกคอนเทนเนอร์แบบ Real-time
+docker compose logs -f
+
+# 4. หยุดการทำงานของทุกคอนเทนเนอร์
+docker compose down
+```
+
+🌐 **เข้าใช้งานผ่านเว็บเบราว์เซอร์**: **[http://localhost:3000](http://localhost:3000)**  
+🔌 **เรียกใช้งาน REST API โดยตรง**: **[http://localhost:5001/api/reports](http://localhost:5001/api/reports)**  
+🗄️ **เชื่อมต่อฐานข้อมูล PostgreSQL**: `localhost:5432` (User: `postgres`, Password: `password123`, DB: `trustline`)
 
 ---
 
 ## 🧪 การทดสอบระบบอัตโนมัติด้วย Selenium Python (10 Test Cases)
 
-ชุดทดสอบอัตโนมัติถูกพัฒนาขึ้นด้วย **Selenium Python เท่านั้น** ตามโจทย์ความต้องการ โดยมุ่งเน้นการทดสอบกับเว็บจริง:  
-👉 **`https://anonymous-report.ai.studio`**
+ชุดทดสอบอัตโนมัติถูกพัฒนาขึ้นด้วย **Selenium Python เท่านั้น** ตามโจทย์ความต้องการ โดยรองรับทั้งการทดสอบกับเว็บจริง:  
+👉 **`https://anonymous-report.ai.studio`**  
+และเว็บจำลองบน Docker Local:  
+👉 **`http://localhost:3000`**
 
 ### 📁 การแยกไฟล์ชุดทดสอบ (10 Separated Test Files)
 ชุดทดสอบถูกแยกออกเป็น **10 ไฟล์อิสระ (1 ไฟล์ ต่อ 1 ข้อทดสอบ)** ภายในโฟลเดอร์ `tests/` เพื่อให้อ่านง่าย บำรุงรักษาง่าย และสามารถสั่งรันแยกเฉพาะข้อได้ทันที:
@@ -99,95 +179,48 @@ pip install -r requirements.txt
 
 สคริปต์ [run_10_tests.py](run_10_tests.py) มาพร้อมระบบสรุปผลภาษาไทย รองรับทั้งการรันครบ 10 ข้อ หรือเจาะจงเฉพาะข้อ:
 
-#### ⚡ 2.1 รันครบทั้ง 10 ไฟล์ตาม User Flow (โหมด Headless ความเร็วสูง)
-```powershell
+#### 2.1 รันครบทั้ง 10 ข้อแบบเรียงตาม User Flow:
+```bash
+# โหมด Headless (ทำงานเบื้องหลังความเร็วสูง - Default):
 python run_10_tests.py
-```
 
-#### 🖥️ 2.2 รันครบทั้ง 10 ไฟล์แบบเปิดหน้าต่าง Chrome จริง (Headed Mode)
-เปิดหน้าต่าง Google Chrome ให้เห็นการทำงาน เมาส์คลิก และการกรอกข้อมูลแบบเรียลไทม์:
-```powershell
+# โหมด Headed (เปิดหน้าต่าง Google Chrome ให้เห็นภาพจริง):
 python run_10_tests.py --headed
-```
 
-#### 🎯 2.3 รันเฉพาะข้อที่ต้องการ (เลือกได้ตั้งแต่ 1 ถึง 10)
-สามารถระบุตัวเลือก `--case <หมายเลข>` เพื่อรันเฉพาะข้อใดข้อหนึ่งได้อย่างรวดเร็ว:
-```powershell
-# รันข้อ 1: login
-python run_10_tests.py --case 1
-
-# รันข้อ 2: กรอกแบบฟอร์มและกดส่ง
-python run_10_tests.py --case 2
-
-# รันข้อ 3: ติดตาม
-python run_10_tests.py --case 3
-
-# รันข้อ 4: login ไม่ได้
-python run_10_tests.py --case 4
-
-# รันข้อ 5: กรอกฟอมผิด
-python run_10_tests.py --case 5
-
-# รันข้อ 6: admin แก้ไข
-python run_10_tests.py --case 6
-
-# รันข้อ 7: ลบ
-python run_10_tests.py --case 7
-
-# รันข้อ 8: กรอกติดตามผิด
-python run_10_tests.py --case 8
-
-# รันข้อ 9: admin ลบ
-python run_10_tests.py --case 9
-
-# รันข้อ 10: admin เปลี่ยน
-python run_10_tests.py --case 10
-```
-
-#### 🌐 2.4 เปลี่ยน URL เป้าหมายในการทดสอบ
-หากต้องการนำไปยิงทดสอบกับ Localhost ของตนเอง:
-```powershell
+# ทดสอบกับระบบบน Local Docker (http://localhost:3000):
 python run_10_tests.py --url http://localhost:3000
 ```
 
----
+#### 2.2 เลือกรันเฉพาะข้อที่ต้องการ (ข้อ 1 - 10):
+```bash
+python run_10_tests.py --case 1       # รันข้อ 1: login
+python run_10_tests.py --case 2       # รันข้อ 2: กรอกแบบฟอร์มและกดส่ง
+python run_10_tests.py --case 3       # รันข้อ 3: ติดตาม
+python run_10_tests.py --case 4       # รันข้อ 4: login ไม่ได้
+python run_10_tests.py --case 5       # รันข้อ 5: กรอกฟอมผิด
+python run_10_tests.py --case 6       # รันข้อ 6: admin แก้ไข
+python run_10_tests.py --case 7       # รันข้อ 7: ลบ
+python run_10_tests.py --case 8       # รันข้อ 8: กรอกติดตามผิด
+python run_10_tests.py --case 9       # รันข้อ 9: admin ลบ
+python run_10_tests.py --case 10      # รันข้อ 10: admin เปลี่ยน
+```
 
-### 3. คำสั่งการรันผ่าน `pytest` โดยตรง
-
-แต่ละไฟล์ได้รับการออกแบบให้เป็นอิสระต่อกัน (Self-contained) จึงสามารถสั่งรันด้วย `pytest` ทีละไฟล์หรือพร้อมกันได้ทันที:
-
-```powershell
-# รันทีละไฟล์แบบละเอียด (-v):
+#### 2.3 การรันผ่าน Pytest โดยตรง:
+```bash
+# รันทีละไฟล์:
 python -m pytest tests/test_01_login.py -v
 python -m pytest "tests/test_02_กรอกแบบฟอร์มและกดส่ง.py" -v
-python -m pytest "tests/test_03_ติดตาม.py" -v
-python -m pytest "tests/test_04_login_ไม่ได้.py" -v
-python -m pytest "tests/test_05_กรอกฟอมผิด.py" -v
-python -m pytest "tests/test_06_admin_แก้ไข.py" -v
-python -m pytest "tests/test_07_ลบ.py" -v
-python -m pytest "tests/test_08_กรอกติดตามผิด.py" -v
-python -m pytest "tests/test_09_admin_ลบ.py" -v
-python -m pytest "tests/test_10_admin_เปลี่ยน.py" -v
 
-# รันไฟล์รวมแบบต่อเนื่อง All-in-One:
-python -m pytest tests/test_portal_10_cases.py -v
+# รันทุกไฟล์ในโฟลเดอร์ tests:
+python -m pytest tests/ -v
 ```
 
 ---
 
-## 📊 สรุปผลการทดสอบจริง (Execution Results)
-
-ผลการทดสอบล่าสุดกับเว็บไซต์จริง **`https://anonymous-report.ai.studio`**:
+### 3. ผลลัพธ์การรันทดสอบจริง (Test Execution Results)
+เมื่อสั่งรัน `python run_10_tests.py` ระบบจะสรุปผลความสำเร็จครบทุกข้อ:
 
 ```text
-================================================================================================
-  🚀 TrustLine / NPRU Sentinel - Automated 10 Separated Files Selenium Test Runner
-================================================================================================
-  🌐 Target Web URL : https://anonymous-report.ai.studio
-  ⚙️ Execution Mode : ⚡ Headless (ทำงานเบื้องหลังความเร็วสูง)
-  🔄 Flow Strategy  : Sequential User Journey (Whistleblower Flow -> Admin Flow)
-  📁 Test Suite     : 10 Individual Test Files (แยก 1 ไฟล์ ต่อ 1 ข้อทดสอบ)
-  🔍 Verification   : Real UI Assertions & Real-Time Cross-Checks On Both Sides
 ================================================================================================
   📊 สรุปผลการทดสอบไฟล์แยกทั้ง 10 ข้อ (Separated 10 Test Cases Summary)
 ================================================================================================
@@ -210,35 +243,11 @@ python -m pytest tests/test_portal_10_cases.py -v
 
 ---
 
-## 🚀 วิธีการรันโปรเจกต์เว็บในเครื่อง (Running the Portal Locally)
+## 🚀 วิธีการรันโปรเจกต์เว็บในเครื่องแบบ Local Development
 
-หากต้องการเปิดเซิร์ฟเวอร์ Local ขึ้นมาใช้งานหรือทดสอบ:
+หากต้องการรันเซิร์ฟเวอร์แบบ Local โดยไม่ใช้ Docker:
 
-### 🐳 แบบที่ 1: รันด้วย Docker Compose (3-Tier Production Stack แนะนำสูงสุด)
-สั่งรันทั้ง 3 คอนเทนเนอร์ (Frontend, Backend, Database) ให้ทำงานร่วมกันแบบสมบูรณ์ด้วยคำสั่งเดียว:
-
-```bash
-# 1. บิลด์และสตาร์ตทั้ง 3 คอนเทนเนอร์พร้อมกัน
-docker compose up -d
-
-# 2. ตรวจสอบสถานะการทำงานและความพร้อม (Health Check)
-docker compose ps
-
-# 3. ดู Log การทำงานแบบเรียลไทม์
-docker compose logs -f
-```
-
-| คอนเทนเนอร์ (Container) | บริการ (Service) | พอร์ต (Host:Container) | รายละเอียดหน้าที่ |
-| :--- | :--- | :---: | :--- |
-| **`trustline-frontend`** | **Frontend (React 19 + Nginx)** | `3000:80` | ให้บริการหน้าเว็บ Single Page App, Reverse Proxy `/api/` และ WebSocket `/ws` |
-| **`trustline-backend`** | **Backend (Node.js Express + ws)** | `5001:5001` | ให้บริการ REST API, Real-time Sync, คัดกรองด้วย Gemini AI และจัดการสำนวน |
-| **`trustline-database`** | **Database (PostgreSQL 16)** | `5432:5432` | เซิร์ฟเวอร์ฐานข้อมูลพร้อม Persistent Volume (`postgres-data`) และ Init Schema |
-
-🌐 **เปิดเว็บเบราว์เซอร์เข้าใช้งานระบบได้ทันทีที่**: **`http://localhost:3000`**
-
----
-
-### แบบที่ 2: Node.js Full-Stack (Local Development)
+### แบบที่ 1: Node.js Full-Stack
 ```bash
 # 1. ติดตั้ง Node Dependencies
 npm install
@@ -251,12 +260,12 @@ npm start
 ```
 เปิดใช้งานได้ทันทีที่: **`http://localhost:3000`**
 
-### แบบที่ 3: Python Flask Backend
+### แบบที่ 2: Python Flask Backend
 ```bash
-# ติดตั้ง Flask
+# 1. ติดตั้ง Flask
 pip install flask flask-cors
 
-# เริ่มรันแอปพลิเคชัน Python
+# 2. เริ่มรันแอปพลิเคชัน Python
 python app.py
 ```
 เปิดใช้งานได้ที่: **`http://localhost:5000`**
@@ -276,11 +285,17 @@ python app.py
 
 ```text
 ├── README.md                           # คู่มือการใช้งานและเอกสารการทดสอบฉบับสมบูรณ์
+├── docker-compose.yml                  # การตั้งค่า Docker 3-Tier Production Stack
+├── Dockerfile.frontend                 # Dockerfile สำหรับ React 19 + Nginx
+├── Dockerfile.backend                  # Dockerfile สำหรับ Node.js Express + WebSockets
+├── Dockerfile                          # Default Dockerfile
+├── nginx.conf                          # Nginx Web Server, Reverse Proxy & WebSockets config
+├── schema.postgres.sql                 # โครงสร้างฐานข้อมูล PostgreSQL + Seed Data
+├── schema.sql                          # โครงสร้างฐานข้อมูล SQLite
 ├── requirements.txt                    # รายการ Dependencies สำหรับ Selenium Python
 ├── run_10_tests.py                     # สคริปต์รันเนอร์หลัก รองรับทั้ง 10 ข้อและเลือกรันรายข้อ
 ├── server.ts                           # Express Backend Server + Gemini AI API Proxy
 ├── app.py                              # Python Flask Alternative Backend
-├── schema.sql                          # โครงสร้างฐานข้อมูล SQLite
 ├── package.json                        # รายการ Dependencies ของฝั่ง Web Application
 ├── src/                                # ซอร์สโค้ด React Frontend (TypeScript + Tailwind)
 ├── screenshots/                        # โฟลเดอร์บันทึกภาพหน้าจอหลักฐานอัตโนมัติ (10 PNGs)
